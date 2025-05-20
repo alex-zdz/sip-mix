@@ -1,6 +1,6 @@
 
 rep_mix_main <- function(y, updates, hyperparameters, starting_values,
-                           n_save, n_burn, n_thin, true_weights){
+                           n_save, n_burn, n_thin){
   
   #hyperparameters = NULL
   #starting_values = NULL
@@ -837,33 +837,35 @@ rep_mix_main <- function(y, updates, hyperparameters, starting_values,
         weights_samp_new <- c(brms::rdirichlet(1, c(alpha_post, alpha_new))) #alpha_prior
         # Then a new location
         if(D == 1){
-          
-          mu_new <- rnorm(1, mu_prop_means, sd = sqrt(mu_prop_Sigma))
+  
           log_accept_birth_locs <- 0
           
           if(repulsive_locations){
+            #mu_new <- rnorm(1, mu_prop_means, sd = sqrt(mu_prop_Sigma))
+            mu_new <- rnorm(1, 0, sd = sqrt(1 / zetas_samp))
             log_new_pwd_mu <-  sum(log(abs(cdist(mu_new, mus_samp))))
             log_accept_birth_locs <-
               log_accept_birth_locs +
               log_G(M_samp, zetas_samp) -
-              log_G(M_samp + 1, zetas_samp) -
-              #kernel
-              (zetas_samp / 2) * mu_new^2 +
+              log_G(M_samp + 1, zetas_samp) +
+              #kernel ca
+              #(zetas_samp / 2) * mu_new^2 +
               # pwd
               zetas_samp * (log_new_pwd_mu)
           }
           
         }else{
-          mu_new <- rmvnorm(1, mu_prop_means, sigma = mu_prop_Sigma)
+          #mu_new <- rmvnorm(1, mu_prop_means, sigma = mu_prop_Sigma)
           for(d in 1:D){
+            mu_new <- rmvnorm(1, rep(0,D), sigma = diag(rep(1 / zetas_samp[d], D)))
             log_new_pwd_mu <-  sum(log(abs(cdist(mu_new[d], mus_samp[d,]))))
             
             log_accept_birth_locs <- 
               log_accept_birth_locs + 
               log_G(M_samp, zetas_samp[d]) -
-              log_G(M_samp + 1, zetas_samp[d]) -
-              #kernel
-              (zetas_samp[d] / 2) * mu_new[d]^2 +
+              log_G(M_samp + 1, zetas_samp[d]) +
+              #kernel cancels if variance is 1 / zetas, watch out for +/-
+              #(zetas_samp[d] / 2) * mu_new[d]^2 +
               # pwd
               zetas_samp[d] * (log_new_pwd_mu)    
             
@@ -891,18 +893,27 @@ rep_mix_main <- function(y, updates, hyperparameters, starting_values,
           lgamma(alpha_new) +
           lgamma(sum(c(alpha_post))) -  
           lgamma(sum(c(alpha_post, alpha_new))) -
-          log(M_na_samp + 1) -
+          log(M_na_samp + 1) +
           #new part from the location proposal
           if(D == 1){
             if(repulsive_locations){
-              -0.5 * log(2 * pi * 1 / zetas_samp) + (1/ (2 * mu_prop_Sigma)) * (mu_new - mu_prop_means)^2
+              # different if var is 1 / zetas
+              # -0.5 * log(2 * pi * 1 / zetas_samp) + (1/ (2 * mu_prop_Sigma)) * (mu_new - mu_prop_means)^2
+               0.5 * (log(2 * pi) - log(zetas_samp)) 
             }else{
               0
             }
           }else{
-            sum(log(dmvnorm_arma_mv(mu_new, mean = mu_prop_means, sigma = mu_prop_Sigma))) 
+            if(repulsive_locations){
+              #sum(log(dmvnorm_arma_mv(mu_new, mean = mu_prop_means, sigma = mu_prop_Sigma))) 
+              # different if var is 1 / zetas
+              sum(0.5 * (log(2 * pi) - log(zetas_samp))) 
+            }else{
+              0
+            }
           }
-        log_accept_birth_bd_probs <- log(1 - p_b) - log(p_b)
+          log_accept_birth_bd_probs <- ifelse(M_na_samp == 0, log(1 - p_b) - log(1), log(1 - p_b) - log(p_b) ) #log(1) = 0 so in case o Mna = 0 --> log(1 - p_b)
+          #log_accept_birth_bd_probs <- log(1 - p_b) - log(p_b)
         # Adding all up
         log_accept_birth <- log_accept_birth_M + log_accept_birth_weights + log_accept_birth_locs + log_accept_birth_bd_props +  log_accept_birth_bd_probs
         # accept-reject 
@@ -952,9 +963,9 @@ rep_mix_main <- function(y, updates, hyperparameters, starting_values,
               log_accept_death_locs +
               # normalization constants
               log_G(M_samp, zetas_samp) -
-              log_G(M_samp - 1, zetas_samp) +
-              #kernel
-              (zetas_samp / 2) * mus_samp[d, M_a_samp + na_close]^2 -
+              log_G(M_samp - 1, zetas_samp) -
+              #kernel cancels if variance is 1 / zetas, watch out for +/-
+              #(zetas_samp / 2) * mus_samp[d, M_a_samp + na_close]^2 -
               # pwd
               zetas_samp * (log_new_pwd_mu)
           }
@@ -962,14 +973,14 @@ rep_mix_main <- function(y, updates, hyperparameters, starting_values,
           
           for(d in 1:D){
             
-            log_new_pwd_mu <-  sum(log(abs(cdist(mus_samp[d,M_a_samp + na_close], mus_samp[d,]))))
+            log_new_pwd_mu <-  sum(log(abs(cdist(mus_samp[d,M_a_samp + na_close], mus_samp[d, -M_a_samp + na_close]))))
             log_accept_death_locs <- 
               log_accept_death_locs +
               # normalization constants
               log_G(M_samp, zetas_samp[d]) -
-              log_G(M_samp - 1, zetas_samp[d]) +
-              #kernel
-              (zetas_samp[d] / 2) * mus_samp[d, M_a_samp + na_close]^2 -
+              log_G(M_samp - 1, zetas_samp[d]) -
+              #kernel cancels if variance is 1 / zetas, watch out for +/-
+              #(zetas_samp[d] / 2) * mus_samp[d, M_a_samp + na_close]^2 -
               # pwd
               zetas_samp[d] * (log_new_pwd_mu)
             
@@ -994,16 +1005,19 @@ rep_mix_main <- function(y, updates, hyperparameters, starting_values,
           if(D == 1){
             if(repulsive_locations){
               # new part from the location proposal
-              -0.5 * log(2 * pi * 1 / zeta_samp) - (1/ (2 * mu_prop_var)) * (mus_samp[M_a_samp + na_close] - mu_prop_means)
+              #-0.5 * log(2 * pi * 1 / zeta_samp) - (1/ (2 * mu_prop_var)) * (mus_samp[M_a_samp + na_close] - mu_prop_means)
+              0.5 * (log(zetas_samp) - log(2 * pi))
             }else{
               0
             }
           }else{
             if(repulsive_locations){
               # new part from the location proposal
-              sum(log(dmvnorm_arma_mv(t(mus_samp[, M_a_samp + na_close, drop = FALSE]), mean = mu_prop_means, sigma = mu_prop_Sigma)))
+              #sum(log(dmvnorm_arma_mv(t(mus_samp[, M_a_samp + na_close, drop = FALSE]), mean = mu_prop_means, sigma = mu_prop_Sigma)))
+              # different if var is 1 / zetas
+              sum(0.5 * (log(zetas_samp) - log(1 / zetas_samp)))
             }else{
-              stop("2D only repulsive done so far")
+              0
             }
           }
         # ratio of birth and death probabilities

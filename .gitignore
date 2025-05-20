@@ -1,1 +1,9 @@
 .Rproj.user
+data*/
+results*/
+*.RDS
+*.rds
+*.RData
+*.pdf
+*.png
+*.jpg

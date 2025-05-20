@@ -7,16 +7,16 @@
 #all_alphas <- c(0.05, 0.1, 1, 10)
 #all_alphas <- c(0.1, 1)
 all_alphas <- c( 1)
-#all_gammas <- c(0, 0.25, 0.5,  1, 98, 100, 101)
-#all_zetas <- c(0.001,  1,  3, 5, 98)
+all_gammas <- c(0, 0.25,  1, 98, 100, 101)
+all_zetas <- c(0.001,  1,  3, 5, 98)
 
-# pre-2025:
-all_gammas <- c(100)
-all_zetas <- c(0.001,  1, 5, 100)
+# # pre-2025:
+# all_gammas <- c(100)
+# all_zetas <- c(0.001,  1, 5, 100)
 
-# 2025:
-all_gammas <- c(0, 0.25, 1, 98, 100)
-all_zetas <- c(0.1, 99)
+# # 2025:
+# all_gammas <- c(0, 0.25, 1, 98, 100)
+# all_zetas <- c(0.1, 99)
 
 repulsive_grid <- expand.grid(all_alphas, all_gammas, all_zetas)
 colnames(repulsive_grid) <- c("alpha", "gamma", "zeta")
@@ -45,7 +45,7 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin, dataset){
   library(MCMCpack)
   # Source functions
   source("src/log_sdir.R")
-  source("src/rep_mix_main_revised.R")
+  source("src/rep_mix_main_new.R")
   # 2 has the option of an independent prior for mu
   Rcpp::sourceCpp("src/rcpp_functions.cpp")
   
@@ -194,7 +194,7 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin, dataset){
     M_na_samp = max(2, rpois(1, M_prior))
     M_samp = M_a_samp + M_na_samp
     allocs_samp = rep(c(1:M_a_samp), length.out = N)
-  }else if(!update_allocs){
+  }else if (!update_allocs) {
     allocs_samp = true_allocs
     M_a_samp = C
     M_na_samp = 0
@@ -270,63 +270,20 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin, dataset){
   true_weights <- c(0.2, 0.2, 0.2, 0.3, 0.1)
   
   #########################################################################
-  set.seed(1)
   
+  set.seed(1)
   startt <- Sys.time()
   
-  results <- rep_mix_main(y, updates = updates, hyperparameters , starting_values = starting_values,
-                          n_save = n_save, n_burn = n_burn, n_thin = n_thin, true_weights)
+  results <- tryCatch({
+    rep_mix_main(y, updates = updates, hyperparameters, starting_values = starting_values,
+                 n_save = n_save, n_burn = n_burn, n_thin = n_thin) #, true_weights
+  }, error = function(e) {
+    message("Error in run: ", run)
+    return(run)
+  })
   
   endt <-  Sys.time() - startt 
   endt
-  
-  # Quick Check:
-  # n_save = 5e3;  n_burn = 5e3; n_thin = 1
-  # (results$mu_out %>% 
-  #   data.frame() %>% 
-  #   dplyr::mutate(iter = 1:n_save) %>% 
-  #   pivot_longer(cols = -iter, names_to = "component", values_to = "value") %>% 
-  #   ggplot() + 
-  #   geom_density(alpha = 0.4, aes(x = value, col = component, fill = component),stat = "density") +
-  #   geom_vline(xintercept = true_mus)) / (results$mu_out %>% 
-  #   data.frame() %>% 
-  #   dplyr::mutate(iter = 1:n_save) %>% 
-  #   pivot_longer(cols = -iter, names_to = "component", values_to = "value") %>% 
-  #   ggplot(aes(x = iter, y = value,  col = component, fill = component)) + 
-  #   geom_line() +
-  #   geom_hline(yintercept = true_mus))
-  # 
-  # results$weights_out %>% 
-  #   data.frame() %>% 
-  #   dplyr::mutate(iter = 1:n_save) %>% 
-  #   pivot_longer(cols = -iter, names_to = "component", values_to = "value") %>% 
-  #   ggplot() + 
-  #   geom_density(alpha = 0.4, aes(x = value, col = component, fill = component),stat = "density") 
-  # 
-  # results$weights_out %>%
-  #   data.frame() %>%
-  #   dplyr::mutate(iter = 1:n_save) %>%
-  #   pivot_longer(cols = -iter, names_to = "component", values_to = "value") %>%
-  #   ggplot(aes(x = iter, y = value,  col = component, fill = component)) +
-  #   geom_line()
-  # 
-  # results$Sigma_out %>% 
-  #   data.frame() %>% 
-  #   dplyr::mutate(iter = 1:n_save) %>% 
-  #   pivot_longer(cols = -iter, names_to = "component", values_to = "value") %>% 
-  #   ggplot() + 
-  #   geom_density(alpha = 0.4, aes(x = value, col = component, fill = component),stat = "density") +
-  #   geom_vline(xintercept = true_sds^2)
-  # 
-  # results$Sigma_out %>% 
-  #   data.frame() %>% 
-  #   dplyr::mutate(iter = 1:n_save) %>% 
-  #   pivot_longer(cols = -iter, names_to = "component", values_to = "value") %>% 
-  #   ggplot(aes(x = iter, y = value,  col = component, fill = component)) + 
-  #   geom_line() +
-  #   geom_hline(yintercept = true_sds^2)
-  
-  # post dens
   
   dir.create(paste0("simstudy/results/",dataset,"/post_dens/"), showWarnings = FALSE, recursive = TRUE)
   saveRDS(colMeans(results$post_dens_out), paste0("simstudy/results/",dataset,"/post_dens/","post_dens_",filename,".rds"))
@@ -365,25 +322,7 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin, dataset){
   
   dir.create(paste0("simstudy/results/",dataset,"/zetas/"), showWarnings = FALSE, recursive = TRUE)
   saveRDS(results$zetas_out, paste0("simstudy/results/",dataset,"/zetas/","zetas_",filename,".rds"))
-  
-  # s_out <- results$alloc_out
-  # a_cost <- 1
-  # 
-  # # binder estimate using the salso package
-  # 
-  # s_binder <- c(salso(results$alloc_out, loss=salso::binder(a = 1)))
-  # J_binder <- max(s_binder)
-  # nj_binder <- table(s_binder)
-  # 
-  # dir.create(paste0("simstudy/results_both_",dataset,"/s_binder/"), showWarnings = FALSE, recursive = TRUE)
-  # saveRDS(s_binder, paste0("simstudy/results_both_",dataset,"/s_binder/","s_binder_",filename,".rds"))
-  # 
-  # dir.create(paste0("simstudy/results_both_",dataset,"/post_dens/"), showWarnings = FALSE, recursive = TRUE)
-  # saveRDS(colMeans(results$post_dens_out), paste0("simstudy/results_both_",dataset,"/post_dens/","post_dens_",filename,".rds"))
-  # 
-  # dir.create(paste0("simstudy/results_both_",dataset,"/M_a/"), showWarnings = FALSE, recursive = TRUE)
-  # saveRDS(results$M_a_out, paste0("simstudy/results_both_",dataset,"/M_a/","M_a_",filename,".rds"))
-  
+
 }
 
 library(pbapply)
@@ -398,12 +337,12 @@ op <- pboptions(type="timer")
 
 n_save = 5e3;  n_burn = 5e3; n_thin = 1
 
-system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl, dataset = "simdata_1"))
-#system.time(pblapply(1, grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl, dataset = "simdata_1"))
-#system.time(pblapply(which(repulsive_grid$gamma == 101), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl, dataset = "simdata_1"))
+#system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl, dataset = "simdata_1"))
+system.time(pblapply(which(repulsive_grid$gamma == 100 & repulsive_grid$zeta == 3), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl, dataset = "simdata_1"))
 
 parallel::stopCluster(cl)
 
+#gamma = 0 and zeta = 99 didnt finish, changed seed to 2
 
 
 
@@ -455,6 +394,9 @@ plots = FALSE
 # 
 # 
 #setwd("~/paper/fullrep/M_random")
+
+
+
 dataset <- "simdata_1"
 y <- readRDS(paste0("simstudy/datasets/",dataset,".rds"))
 repulsive_grid <- readRDS(paste0("simstudy/grid/repulsive_grid.rds"))
@@ -475,6 +417,8 @@ dir.create(paste0("simstudy/results/",dataset,"/plots/"), showWarnings = FALSE, 
 #library(label.switching)
 library(mcclust.ext)
 library(ggalt)
+library(tidyverse)
+library(salso)
 all_mus.w <- data.frame()
 all_weights.w <- data.frame()
 all_sigmas.w <- data.frame()
@@ -494,15 +438,15 @@ for(run in 1:nrow(repulsive_grid)){
   print(run)
   filename <- paste0( paste0(colnames(repulsive_grid[run,]), "_"), paste0(repulsive_grid[run,]), collapse = "_" )
 
-  w3.w <- matrix(NA, n_save, 3)
-  for(i in 1:n_save){
-    w3.w[i,] <- readRDS(paste0("simstudy/results/",dataset,"/weights/","weights_",filename,".rds"))[[i]][1:3]
-  }
+  # w3.w <- matrix(NA, n_save, 3)
+  # for(i in 1:n_save){
+  #   w3.w[i,] <- readRDS(paste0("simstudy/results/",dataset,"/weights/","weights_",filename,".rds"))[[i]][1:3]
+  # }
 
-  # weights:
-  all_ws.l_list[[run]] <-
-    cbind(repulsive_grid[run,], w3.w) %>% mutate(iter = 1:n_save) %>%
-    pivot_longer(cols = -c(colnames(repulsive_grid),"iter"), names_to = "component", values_to = "value")
+  # # weights:
+  # all_ws.l_list[[run]] <-
+  #   cbind(repulsive_grid[run,], w3.w) %>% mutate(iter = 1:n_save) %>%
+  #   pivot_longer(cols = -c(colnames(repulsive_grid),"iter"), names_to = "component", values_to = "value")
 
   # M_a
 
@@ -516,54 +460,54 @@ for(run in 1:nrow(repulsive_grid)){
   gamma_samp <- repulsive_grid$gamma[run]
   alpha_prior <- repulsive_grid$alpha[run]
 
-  allocs <- readRDS(paste0("simstudy/results/",dataset,"/allocs/","allocs_",filename,".rds"))
-  s_binder <- c(salso(allocs, loss=salso::binder(a = 1)))
+  # allocs <- readRDS(paste0("simstudy/results/",dataset,"/allocs/","allocs_",filename,".rds"))
+  # s_binder <- c(salso(allocs, loss=salso::binder(a = 1)))
 
-  df <- data.frame(x = y[,1], y = y[,2], Cluster = factor(s_binder))
+  # df <- data.frame(x = y[,1], y = y[,2], Cluster = factor(s_binder))
 
-  binder.ggs[[run]] <-
-    ggplot() +
-    geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
-    geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
-                  size = 0.5, expand = 0, alpha = 0.15, s_shape = 0.5,  spread=0.025) +
-    labs(title = paste0("Binder \n zeta = ", zetas_samp[1], " and gamma = ", gamma_samp), x = "BMI", y = "CEBQ Person Parameter", legend = "test") +
-    theme_minimal()
+  # binder.ggs[[run]] <-
+  #   ggplot() +
+  #   geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
+  #   geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
+  #                 size = 0.5, expand = 0, alpha = 0.15, s_shape = 0.5,  spread=0.025) +
+  #   labs(title = paste0("Binder \n zeta = ", zetas_samp[1], " and gamma = ", gamma_samp), x = "BMI", y = "CEBQ Person Parameter", legend = "test") +
+  #   theme_minimal()
 
-  s_vi <- c(salso(allocs, loss=salso::VI(a = 1)))
+  # s_vi <- c(salso(allocs, loss=salso::VI(a = 1)))
 
-  df <- data.frame(x = y[,1], y = y[,2], Cluster = factor(s_vi))
+  # df <- data.frame(x = y[,1], y = y[,2], Cluster = factor(s_vi))
 
-  vi.ggs[[run]] <-
-    ggplot() +
-    geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
-    geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
-                  size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-    labs(title = paste0("vi \n zeta = ", zetas_samp[1], " and gamma = ", gamma_samp), x = "BMI", y = "CEBQ Person Parameter", legend = "test") +
-    theme_minimal()
+  # vi.ggs[[run]] <-
+  #   ggplot() +
+  #   geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
+  #   geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
+  #                 size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
+  #   labs(title = paste0("vi \n zeta = ", zetas_samp[1], " and gamma = ", gamma_samp), x = "BMI", y = "CEBQ Person Parameter", legend = "test") +
+  #   theme_minimal()
 
 
 }
 
-all_ws.l <- do.call(rbind, all_ws.l_list)
-# Double checking which runs had good mixing:
-ess_threshold <- 50
-#
-all_ws_filtered <- all_ws.l %>%
-  na.omit() %>%
-  group_by(alpha, gamma, zeta, component) %>%
-  summarise(ess = effectiveSize(value), .groups = 'drop')
-#
+# all_ws.l <- do.call(rbind, all_ws.l_list)
+# # Double checking which runs had good mixing:
+# ess_threshold <- 50
+# #
+# all_ws_filtered <- all_ws.l %>%
+#   na.omit() %>%
+#   group_by(alpha, gamma, zeta, component) %>%
+#   summarise(ess = effectiveSize(value), .groups = 'drop')
+
 # constellations_majority_ess <- all_ws_filtered %>%
 #   group_by(alpha, gamma,zeta) %>%
 #   summarise(num_low_ess_components = sum(ess < ess_threshold),  .groups = 'drop') %>%
 #   # filter(num_low_ess_components < ceiling(M_samp / 2))
 #   filter(num_low_ess_components < 2)
-#
+
 # ess_ws.l <- all_ws.l %>%
 #   inner_join(constellations_majority_ess, by = c("alpha", "gamma", "zeta"))
-#
+
 # nrow(ess_ws.l) / nrow(all_ws.l)
-#
+
 # ess_ws.l %>%
 #   filter(alpha ==1) %>%
 #   ggplot(aes(x = iter, y = value, col = component))+
@@ -579,32 +523,33 @@ all_ws_filtered <- all_ws.l %>%
 # ---> all look decent!
 
 
+
 # Scatterplot of the data with true clusters
 
-# set.seed(3)
-# N <- 300
-# D = 2
-# true_weights <- c(0.2, 0.2, 0.2, 0.3, 0.1)
-# true_mus_1 <- c(-3, -3, 3, 3, -1)
-# true_mus_2 <- c(-2.5, 3, -3, 3, 0)
-# true_mus <- rbind(true_mus_1, true_mus_2)
-# C <- length(true_mus_1)
-#
-# true_Sigmas <- array(
-#   matrix(c(3, 1, 1, 3), 2, 2),
-#   dim = c(2, 2, C)
-# )
-# # elongate 4th cluster to overlap with the 3rd:
-# #true_Sigmas[,,4] <- matrix(c(1, 0, 0, 10), 2, 2)
-# # make redundant cluster smaller:
-# true_Sigmas[,,5] <- matrix(c(0.25, 0, 0, 0.25), 2, 2)
+set.seed(3)
+N <- 300
+D = 2
+true_weights <- c(0.2, 0.2, 0.2, 0.3, 0.1)
+true_mus_1 <- c(-3, -3, 3, 3, -1)
+true_mus_2 <- c(-2.5, 3, -3, 3, 0)
+true_mus <- rbind(true_mus_1, true_mus_2)
+C <- length(true_mus_1)
+
+true_Sigmas <- array(
+  matrix(c(3, 1, 1, 3), 2, 2),
+  dim = c(2, 2, C)
+)
+# elongate 4th cluster to overlap with the 3rd:
+#true_Sigmas[,,4] <- matrix(c(1, 0, 0, 10), 2, 2)
+# make redundant cluster smaller:
+true_Sigmas[,,5] <- matrix(c(0.25, 0, 0, 0.25), 2, 2)
 set.seed(3)
 true_allocs <- sample(C, N, prob = true_weights, replace = TRUE)
 y2 <- data.frame(y, cluster = true_allocs )
 
 # Scatter plot with clusters encircled
 
-
+library(ggsci)
 #pdf(paste0("simstudy/results/",dataset,"/plots/data_cluster.pdf"), width = 10, height = 10)
 
 ggplot(y2, aes(x = X1, y = X2, color = factor(cluster))) +
@@ -666,7 +611,7 @@ cluster_centers$Cluster <- c(5,1,3,4,2)
 
 #true_similarity_df$Cluster <- as.factor(true_allocs[true_similarity_df$Observation1])
 
-pdf(paste0("simstudy/results/",dataset,"/plots/true_similarity_matrix.pdf"), width = 10, height = 10)
+#pdf(paste0("simstudy/results/",dataset,"/plots/true_similarity_matrix.pdf"), width = 10, height = 10)
 
 ggplot(true_similarity_df, aes(x = Observation1, y = Observation2, fill = Similarity)) +
   geom_tile() +
@@ -697,7 +642,7 @@ dev.off()
 
 repulsive_grid
 
-repulsive_grid_fixed <- data.frame(repulsive_grid) %>% filter(!(gamma %in% c(0.5,99:101)) & !(zeta %in% c(98, 1, 3))) %>% arrange(gamma, zeta)
+repulsive_grid_fixed <- data.frame(repulsive_grid) %>% filter(!(gamma %in% c(0.5,99:101)) & !(zeta %in% c(98, 99))) %>% arrange(gamma, zeta)
 
 gg_psms <- list()
 for(run in 1:nrow(repulsive_grid_fixed)){
@@ -761,7 +706,7 @@ for(run in 1:nrow(repulsive_grid_fixed)){
 
 
 par(mar = c(2, 2, 2, 2), oma = c(0, 0, 0, 0))
-
+library(patchwork)
 grid_plot <-
 ((gg_psms[[1]] | gg_psms[[2]] | gg_psms[[3]] | gg_psms[[4]]) &
   theme(plot.margin = unit(c(0, 0, 0, 0), "cm")))/
@@ -827,12 +772,15 @@ dev.off()
 # Fixed values only
 
 # filtering out values depending on needs
+library(ggsci)
+table(all_M_a.w$gamma)
+table(all_M_a.w$zeta)
 
 pdf(paste0("simstudy/results/",dataset,"/plots/M_a_bar_fixed_2025.pdf"), width = 10, height = 10)
 
 gg_M_a_bar_fixed <-
 all_M_a.w %>%
-  filter(!(gamma %in% c(0.5,99:101)) & !(zeta %in% c(98, 1, 3))) %>% arrange(gamma, zeta) %>%
+  filter(!(gamma %in% c(0.5,99:101)) & !(zeta %in% c(98))) %>% arrange(gamma, zeta) %>%
   #filter(!(gamma %in% c(0.5,99:101)) & !(zeta %in% c(1, 3, 98))) %>%
   #filter(!(gamma %in% c(0.5,99:101))) %>%
   mutate(gamma = ifelse(gamma == 98, "G(3,2)", gamma)) %>%
@@ -1020,7 +968,8 @@ for(run in psm_prior_plot_order){
 
 dev.off()
 
-
+ library(gridExtra)
+ do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 3)]), ncol=2))
 # Binder estimate:
 #run = 1
 
@@ -1047,8 +996,7 @@ dev.off()
 # Gamma posteriors for the ratio plots
 ################################################################################
 
-repulsive_grid_prior <- repulsive_grid %>% filter((gamma %in% c(100)) & (zeta %in% c(0.001, 0.1, 5, 99))) %>% arrange(gamma, zeta)
-
+repulsive_grid_prior <- repulsive_grid %>% filter((gamma %in% c(100)) & (zeta %in% c(0.001, 0.1, 1, 5, 98, 99))) %>% arrange(gamma, zeta)
 
 
 all_repara.w <- data.frame()
@@ -1074,124 +1022,6 @@ for(run in 1:nrow(repulsive_grid_prior)){
 
 all_repara.l <- all_repara.w %>%
   pivot_longer(cols =-c("alpha", "gamma", "zeta", "iter"), values_to = "value", names_to = "repara")
-
-
-
-# create_paper_plots <- function(df, geom, ncol, legend){
-#
-#
-#   if(geom == "line"){
-#
-#     plot <-   df %>%
-#       filter(repara == "gamma_out") %>%
-#       mutate(repara = ifelse(repara == "gamma_out", "", repara)) %>%
-#       filter(zeta != 3) %>%
-#       mutate(zeta = ifelse(zeta == 99, 100, zeta)) %>%
-#       ggplot(aes(x = iter, y = value, col = factor(zeta))) +
-#       geom_line()+
-#       facet_wrap(gamma ~ zeta, scales = "free", ncol = ncol) +
-#       labs(title = "",
-#            x = "",
-#            y = "",
-#            col = expression(gamma)) +
-#       theme_minimal() +
-#       scale_color_npg() +
-#       if(legend == TRUE){
-#         theme(legend.position = "bottom")
-#       }else{
-#         theme(legend.position = "none")
-#       }  +
-#       theme(panel.spacing = unit(1, "cm"),  # Increase the distance between plots
-#             text=element_text(size=20), #change font size of all text
-#             strip.text.x = element_blank(),
-#             axis.text=element_text(size=15), #change font size of axis text
-#             axis.title=element_text(size=15), #change font size of axis titles
-#             plot.title=element_text(size=15), #change font size of plot title
-#             legend.text=element_text(size=15), #change font size of legend text
-#             legend.title=element_text(size=15))
-#
-#   }else if(geom == "density"){
-#
-#     plot <- df %>%
-#       filter(repara == "gamma_out") %>%
-#       filter(zeta != 3) %>%
-#       mutate(zeta = ifelse(zeta == 99, 100, zeta)) %>%
-#       ggplot(aes(x = value, fill = factor(zeta), col = factor(zeta))) +
-#       geom_density(alpha = 0.4)+
-#       facet_wrap(zeta ~ ., scales = "free", ncol = ncol) +
-#       labs(title = "",
-#            x = "",
-#            y = "",
-#            col = expression(gamma),
-#            fill = expression(gamma)) +
-#       theme_minimal() +
-#       scale_fill_npg() +
-#       scale_color_npg() +
-#       if(legend == TRUE){
-#         theme(legend.position = "bottom")
-#       }else{
-#         theme(legend.position = "none")
-#       }  +
-#       theme(panel.spacing = unit(1, "cm"),  # Increase the distance between plots
-#             text=element_text(size=20), #change font size of all text
-#             #strip.background = element_blank(),
-#             strip.text.x = element_blank(),
-#             axis.text=element_text(size=15), #change font size of axis text
-#             axis.title=element_text(size=15), #change font size of axis titles
-#             plot.title=element_text(size=15), #change font size of plot title
-#             legend.text=element_text(size=15), #change font size of legend text
-#             legend.title=element_text(size=15))
-#
-#
-#   }else if(geom == "barplot"){
-#
-#     plot <-  df %>%
-#       filter(zeta != 3) %>%
-#       mutate(zeta = ifelse(zeta == 99, 100, zeta)) %>%
-#       ggplot(aes(x = M_a, fill = factor(zeta)))+
-#       geom_bar(aes(y = after_stat(prop)),position = "dodge2") +
-#       facet_wrap(zeta ~., scales = "fixed", ncol = ncol) +
-#       labs(title = "",
-#            x = "",
-#            y = "",
-#            fill = expression(zeta /gamma)) +
-#       theme_minimal() +
-#       scale_fill_npg() +
-#       # if(legend == TRUE){
-#       #   theme(legend.position = "bottom")
-#       # }else{
-#       #   theme(legend.position = "none")
-#       # }  +
-#       theme(panel.spacing = unit(1, "cm"),
-#             text=element_text(size=20), #change font size of all text
-#             strip.background = element_blank(),
-#             strip.text.x = element_blank(),
-#             axis.text=element_text(size=15), #change font size of axis text
-#             axis.title=element_text(size=15), #change font size of axis titles
-#             plot.title=element_text(size=15), #change font size of plot title
-#             legend.text=element_text(size=15), #change font size of legend text
-#             legend.title=element_text(size=15))+
-#       scale_x_continuous(breaks = scales::breaks_pretty(n = 10))
-#
-#   }
-#
-#   return(plot)
-#
-# }
-
-# New function:
-
-# to delete
-# test <- all_repara.l%>%
-#   filter(!(gamma %in% gamma_exclude) & !(zeta %in% zeta_exclude))
-# table(test$gamma)
-# table(test$zeta)
-
-#create_paper_plots(all_repara.l, "line", 1,legend = FALSE, gamma_include = c(98, 101), zeta_include = c(0.001, 0.1, 5, 99))
-
-#df = all_repara.l
-
-repulsive_grid_prior
 
 create_paper_plots <- function(df, geom, ncol, legend, gamma_include = c(98, 101), zeta_include = c(98)) {
 
@@ -1343,9 +1173,9 @@ gg_psm_nps <- gg_psms[[1]] / gg_psms[[2]] / gg_psms[[3]] / gg_psms[[4]]
 # Ncol 1 combined now with psm
 
 # Example ggplot objects
-p1 <- create_paper_plots(all_repara.l, "line", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 0.1, 5, 99))
-p2 <-  create_paper_plots(all_repara.l, "density", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 0.1, 5, 99))
-p3 <- create_paper_plots(all_M_a.w, "barplot", 1 ,legend = TRUE, gamma_include = c(100), zeta_include = c(0.001, 0.1, 5, 99)) +
+p1 <- create_paper_plots(all_repara.l, "line", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 98))
+p2 <-  create_paper_plots(all_repara.l, "density", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 98))
+p3 <- create_paper_plots(all_M_a.w, "barplot", 1 ,legend = TRUE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 98)) +
   theme(
   legend.text = element_text(size = 20),  # Adjust legend text size
   legend.title = element_text(size = 20), # Adjust legend title size
@@ -1366,435 +1196,7 @@ png( paste0(path,"M_bar_repara_line_dens_psm_legendside_2025.png"),
 
 #(p1 + theme(legend.position = "none"))  | (p2 + theme(legend.position = "none"))| (gg_psm_nps + theme(legend.position = "none")) | (p3 + plot_layout(guides = "collect"))
 
-
 p1 + p2 + gg_psm_nps +  p3 +
   plot_layout(guides = "collect", ncol = 4, widths = c(2, 1, 1, 2))
 
 dev.off()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#################################################################################
-# Old
-#################################################################################
-
-
-
-
-
-if(plots){
-  dir.create(paste0("simstudy/results/",dataset,"/plots/"), showWarnings = FALSE, recursive = TRUE)
-  #library(label.switching)
-  library(mcclust.ext)
-  library(reshape2)
-  all_mus.w <- data.frame()
-  all_weights.w <- data.frame()
-  all_sigmas.w <- data.frame()
-  all_M_a.w <- data.frame()
-  all_post_dens.w <- data.frame()
-  all_psms <- list()
-  binder.ggs <- list()
-  vi.ggs <- list()
-
-  for(run in 1:nrow(repulsive_grid)){
-
-    filename <- paste0( paste0(colnames(repulsive_grid[run,]), "_"), paste0(repulsive_grid[run,]), collapse = "_" )
-
-    # M_a
-
-    M_a.w <- cbind(repulsive_grid[run,],
-                   readRDS(paste0("simstudy/results/",dataset,"/M_a/","M_a_",filename,".rds")))%>%
-      mutate(iter = 1:n_save)
-
-    all_M_a.w <- rbind(all_M_a.w, M_a.w)
-
-
-    # post_dens.w <- cbind(repulsive_grid[run,],y_line,
-    #                      readRDS(paste0("simstudy/results/",dataset,"/post_dens/","post_dens_",filename,".rds")))
-    #
-    # all_post_dens.w <- rbind(all_post_dens.w, post_dens.w)
-
-    zetas_samp <- rep(repulsive_grid$zeta[run], 2)
-    gamma_samp <- repulsive_grid$gamma[run]
-    alpha_prior <- repulsive_grid$alpha[run]
-    filename <- paste0( paste0(colnames(repulsive_grid[run,]), "_"), paste0(repulsive_grid[run,]), collapse = "_" )
-
-    allocs <- readRDS(paste0("simstudy/results/",dataset,"/allocs/","allocs_",filename,".rds"))
-    #allocs <- results$alloc_out
-    s_binder <- c(salso(allocs, loss=salso::binder(a = 1)))
-
-
-    binder.ggs[[run]] <-
-      ggplot() +
-      geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
-      geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
-                    size = 0.5, expand = 0, alpha = 0.15, s_shape = 0.5,  spread=0.025) +
-      labs(title = paste0("Binder \n zeta = ", zetas_samp[1], " and gamma = ", gamma_samp), x = "BMI", y = "CEBQ Person Parameter", legend = "test") +
-      theme_minimal()
-
-    s_vi <- c(salso(allocs, loss=salso::VI(a = 1)))
-
-    df <- data.frame(x = y[,1], y = y[,2], Cluster = factor(s_vi))
-
-    vi.ggs[[run]] <-
-      ggplot() +
-      geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
-      geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
-                    size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-      labs(title = paste0("vi \n zeta = ", zetas_samp[1], " and gamma = ", gamma_samp), x = "BMI", y = "CEBQ Person Parameter", legend = "test") +
-      theme_minimal()
-
-
-  }
-
-
-  # Binder estimate:
-  #run = 1
-
-  pdf(paste0("simstudy/results/",dataset,"/plots/binder.pdf"), width = 12, height = 10)
-
-  for(start_index in seq(1, nrow(repulsive_grid), by = length(unique(all_gammas)))){
-    do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 3)]), ncol=2))
-  }
-
-  dev.off()
-
-
-  pdf(paste0("simstudy/results/",dataset,"/plots/vi.pdf"), width = 12, height = 10)
-
-  for(start_index in seq(1, nrow(repulsive_grid), by = length(unique(all_gammas)))){
-    do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 3)]), ncol=2))
-  }
-
-  dev.off()
-
-
-
-  grid_rev <- data.frame(alpha = expand.grid(all_gammas, all_alphas)[,2], gamma = expand.grid(all_gammas, all_alphas)[,1])
-  all_clust_vars.l <- data.frame()
-  all_clust_ginis.l <- data.frame()
-  all_clust_ents.l <- data.frame()
-
-  for(run in 1:nrow(grid_rev)){
-    print(paste0("run = ", run))
-    filename <- paste0( paste0(colnames(grid_rev[run,]), "_"), paste0(grid_rev[run,]), collapse = "_" )
-
-    # allocs
-    allocs <- readRDS(paste0("simstudy/results/",dataset,"/allocs/","allocs_",filename,".rds"))
-
-    clust_vars <- cbind(grid_rev[run,], value = variance_cluster_sizes(allocs))%>% mutate(iter = 1:n_save)
-    all_clust_vars.l <- rbind(all_clust_vars.l, clust_vars)
-
-    clust_ginis <- cbind(grid_rev[run,], value = gini_coefficient(allocs))%>% mutate(iter = 1:n_save)
-    all_clust_ginis.l <- rbind(all_clust_ginis.l, clust_ginis)
-
-    clust_ents <- cbind(grid_rev[run,], value = entropy(allocs))%>% mutate(iter = 1:n_save)
-    all_clust_ents.l <- rbind(all_clust_ents.l, clust_ents)
-
-  }
-
-  #layout(matrix(c(1:nrow(repulsive_grid)), length(all_alphas), length(all_gammas), byrow = TRUE))
-
-  grid_rev_small <- data.frame(alpha = expand.grid(all_gammas, all_alphas)[,2], gamma = expand.grid(all_gammas, all_alphas)[,1]) %>%
-    filter(!gamma %in% c(0.5, 5))
-
-
-
-  # pdf(paste0("simstudy/results/",dataset,"/plots/psm.pdf"), width = 15, height = 10)
-  #
-  layout(matrix(c(1:nrow(repulsive_grid)), length(unique(repulsive_grid$zeta)), length(unique(repulsive_grid$gamma)), byrow = TRUE))
-  for(run in 1:nrow(repulsive_grid)){
-
-    filename <- paste0( paste0(colnames(repulsive_grid[run,]), "_"), paste0(repulsive_grid[run,]), collapse = "_" )
-    allocs <- readRDS(paste0("simstudy/results/",dataset,"/allocs/","allocs_",filename,".rds"))
-    #plotpsm(psm(allocs), main = paste0("PSM for ", gsub("_", " = ", filename)), method = "complete")
-    psm <- psm(allocs)
-    hc = hclust(as.dist(1 - psm), method = "complete", members = NULL)
-    psm_hc = psm
-    n = nrow(psm)
-    psm_hc[1:n, ] = psm_hc[hc$order, ]
-    psm_hc[, 1:n] = psm_hc[, hc$order]
-    image(1:n, 1:n, 1 - psm_hc, col = viridis(20))
-
-
-  }
-  #
-  # dev.off()
-
-  # New code for psm with ggplot:
-
-  # pdf(paste0("simstudy/results/",dataset,"/plots/psm.pdf"), width = 15, height = 10)
-  #
-
-  plotpsm(psm(allocs), main = paste0("PSM for ", gsub("_", " = ", filename)), method = "complete")
-
-
-  all_psm <- data.frame()
-  gg_psm <- list()
-  for(run in 1:nrow(repulsive_grid)){
-
-    filename <- paste0( paste0(colnames(repulsive_grid[run,]), "_"), paste0(repulsive_grid[run,]), collapse = "_" )
-    allocs <- readRDS(paste0("simstudy/results/",dataset,"/allocs/","allocs_",filename,".rds"))
-    # Compute the Posterior Similarity Matrix from the allocation matrix
-    psm <- matrix(0, nrow = ncol(allocs), ncol = ncol(allocs))
-
-    for (i in 1:nrow(allocs)) {
-      psm <- psm + (outer(allocs[i, ], allocs[i, ], "=="))
-    }
-
-    # Normalize the similarity matrix by the number of iterations
-    psm <- psm / nrow(allocs)
-
-    # Convert the matrix to a format suitable for ggplot2
-
-    all_psm <- melt(posterior_similarity) %>% rbind(all_psm)
-
-    # Perform hierarchical clustering on the similarity matrix
-    #"ward.D", "ward.D2", "single", "complete", "average" (= UPGMA), "mcquitty" (= WPGMA), "median" (= WPGMC) or "centroid" (= UPGMC).
-    hc <- hclust(as.dist(1 - psm))
-    reordered_indices <- hc$order
-    similarity_df$Observation1 <- factor(similarity_df$Observation1, levels = reordered_indices)
-    similarity_df$Observation2 <- factor(similarity_df$Observation2, levels = reordered_indices)
-
-    hc = hclust(as.dist(1 - psm), method = method, members = NULL)
-    psm_hc = psm
-    n = nrow(psm)
-    psm_hc[1:n, ] = psm_hc[hc$order, ]
-    psm_hc[, 1:n] = psm_hc[, hc$order]
-    image(1:n, 1:n, 1 - psm_hc, col = heat.colors(20), ...)
-
-    psm_hc2 <- psm
-    psm_hc2[1:n, ] = psm_hc2[reordered_indices,]
-    psm_hc2[, 1:n] = psm_hc2[,reordered_indices]
-    image(1:n, 1:n, 1 - psm_hc2, col = viridis(20))
-
-    # Plot the clustered heatmap
-    gg_psm[[run]] <- ggplot(similarity_df, aes(x = Observation1, y = Observation2, fill = Similarity)) +
-      geom_tile() +
-      scale_fill_gradient(low = "white", high = "darkred") +
-      labs(title = "",
-           x = "",
-           y = "",
-           fill = "") +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(),
-            axis.text.y = element_blank())
-
-    ggplot(similarity_df, aes(x = Observation1, y = Observation2, fill = 1 - Similarity)) +
-      geom_tile() +
-      scale_fill_gradient(low = "white", high = "darkred") +
-      labs(title = "",
-           x = "",
-           y = "",
-           fill = "") +
-      theme_minimal() +
-      theme(axis.text.x = element_blank(),
-            axis.text.y = element_blank())
-
-
-  }
-
-  colnames(all_psm) <- c("Observation1", "Observation2", "Similarity")
-
-
-  library(gridExtra)
-  grid.arrange(grobs = gg_psm, ncol = 4, nrow = 4)
-
-
-
-
-
-  #
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  gini_var_ent_means <- rbind(
-    all_clust_ents.l %>%
-      dplyr::group_by(alpha, gamma) %>%
-      dplyr::summarize(mean = mean ( value)) %>%
-      mutate(variable = "Entropy")
-    ,
-    all_clust_vars.l %>%
-      dplyr::group_by(alpha, gamma) %>%
-      dplyr::summarize(mean = mean ( value)) %>%
-      mutate(variable = "Variance")
-    ,
-    all_clust_ginis.l %>%
-      dplyr::group_by(alpha, gamma) %>%
-      dplyr::summarize(mean = mean ( value))%>%
-      mutate(variable = "Gini Coefficient")
-  ) %>%
-    mutate(alpha = as.factor(alpha), gamma = as.factor(gamma))
-
-  gini_var_ent_means %>%
-    ggplot(aes(x = alpha, y = mean, fill = gamma)) +
-    geom_bar(stat = "identity", position = position_dodge2()) +
-    facet_wrap(variable~., scales = "free", ncol = 1) +
-    theme_minimal()
-
-  pdf(paste0("simstudy/results/",dataset,"/plots/gini_var.pdf"), width = 15, height = 10)
-
-  gini_var_ent_means %>%
-    filter(variable!="Entropy", !gamma %in% c(0.5, 5)) %>%
-    ggplot(aes(x = alpha, y = mean, fill = gamma)) +
-    geom_bar(stat = "identity", position = position_dodge2()) +
-    facet_wrap(variable~., scales = "free", ncol = 1) +
-    theme_minimal() +
-    theme(axis.text.x = element_text(size = 14), axis.title.x = element_text(size = 16),
-          axis.text.y = element_text(size = 14), axis.title.y = element_text(size = 16),
-          strip.text.x = element_text(size = 20),
-          legend.text = element_text(size = 20),
-          legend.title  = element_text(size = 20))
-
-  dev.off()
-
-
-
-  # M_a
-  #M_a.l <- all_M_a.w %>% pivot_longer(cols = -c("alpha", "gamma", "zeta","iter"), names_to = "component", values_to = "value")
-
-  colnames(all_M_a.w)[4] <- "value"
-
-  pdf(paste0("simstudy/results/",dataset,"/plots/M_bar.pdf"), width = 15, height = 10)
-
-  all_M_a.w %>%
-    dplyr::mutate(across(any_of(c(colnames(repulsive_grid), "component")), as.factor)) %>%
-    filter(!gamma %in% c(0.5, 5)) %>%
-    ggplot(aes(x = value, fill = gamma)) +
-    geom_bar(aes(y = ..prop..), position = position_dodge2(width = 0.9, preserve = "single")) +
-    facet_wrap( zeta ~ . , scales = "free") +
-    theme_bw() +
-    ggtitle(paste0("")) +
-    xlab("")+
-    ylab("") +
-    theme(text=element_text(size=20), #change font size of all text
-          axis.text=element_text(size=20), #change font size of axis text
-          axis.title=element_text(size=20), #change font size of axis titles
-          plot.title=element_text(size=20), #change font size of plot title
-          legend.text=element_text(size=25), #change font size of legend text
-          legend.title=element_text(size=25)) #change font size of legend title
-
-  dev.off()
-
-  M_a.l %>%
-    dplyr::mutate(across(any_of(c(colnames(repulsive_grid), "component")), as.factor)) %>%
-    ggplot(aes(x = iter, y = value, col = gamma)) +
-    geom_line() +
-    facet_wrap( alpha ~ gamma , scales = "fixed", ncol = length(all_gammas))
-
-  # Posterior density
-
-  colnames(all_post_dens.w)[4] <- "post_dens"
-
-  pdf(paste0("simstudy/results/",dataset,"/plots/post_dens.pdf"), width = 15, height = 10)
-
-  all_post_dens.w %>%
-    filter(!gamma %in% c(0.5, 5)) %>%
-    dplyr::mutate(across(any_of(c(colnames(repulsive_grid), "component")), as.factor)) %>%
-    ggplot() +
-    geom_line(aes(x = y_line, y = post_dens, col = gamma), size = 1) +
-    #scale_size_identity() +
-    #scale_linetype_identity() +
-    geom_histogram(data = data.frame(value = y), aes(x = value, y = ..density..), alpha = .5, bins = 40) +
-    facet_wrap(alpha~gamma, ncol =3) +
-    theme_bw() +
-    ggtitle(paste0("")) +
-    xlab("")+
-    ylab("") +
-    theme( #strip.background = element_blank(),
-      #strip.text.x = element_blank(),
-      text=element_text(size=20), #change font size of all text
-      axis.text=element_text(size=20), #change font size of axis text
-      axis.title=element_text(size=20), #change font size of axis titles
-      plot.title=element_text(size=20), #change font size of plot title
-      legend.text=element_text(size=25), #change font size of legend text
-      legend.title=element_text(size=25)) #change font size of legend title
-
-  dev.off()
-
-
-
-
-}
-
-
