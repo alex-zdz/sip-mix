@@ -11,13 +11,18 @@ library(patchwork)
 library(ggalt)
 
 # replicate repulsive grid used to run the analysis in "fapp_fav_both.R"
+# Create grid
 all_gammas <- c(0, 0.1, 0.5, 1, 2, 5)
 all_zetas <- c(0.001, 0.1, 0.5, 1, 2, 3 )
+#all_zetas <- c(0.001, 0.1, 0.5, 1, 2, 3, 5)
+all_datasets <- c("bmi_pp_fa", "bmi_pp_fav")
+
+# 01.04.2025 trying the food-avoidance food-approach dataset:
 all_datasets <- c("fapp_fav")
 all_datasets <- c("bmi_pp_fa")
+
 all_updates <- c("fixed")
-all_alphas <- c(0.5, 1, 3, 5)
-all_alphas <- c( 1, 3, 5)
+all_alphas <- c( 1, 3, 5) # 0. already run
 repulsive_grid <- expand.grid(all_gammas, all_zetas, all_datasets, all_updates, all_alphas)
 colnames(repulsive_grid) <- c("gamma", "zeta", "dataset", "update", "alpha")
 all_datasets <- unique(repulsive_grid$dataset)
@@ -25,15 +30,15 @@ all_data <- list()
 
 dataset <- all_datasets[1]
 
-y <- readRDS(paste0("data/",dataset,".RDS"))
+y <- readRDS(paste0("empirical/data/",dataset,".RDS"))
 colnames(y) <- c("V1", "V2")
 all_data[[1]] <- y
 
 filename <- paste0( paste0(colnames(repulsive_grid[35,-3]), "_"), paste0(repulsive_grid[35,-3]), collapse = "_" )
 
-n_save <- length(readRDS(paste0("results","fapp_fav","/M_a/M_a_", filename,".rds")))
+n_save <- length(readRDS(paste0("empirical/results_",dataset,"/M_a/M_a_", filename,".rds")))
 # Pre-determined length of evaluated grid:
-post_pred_length <- sqrt(length(readRDS(paste0("results","fapp_fav","/post_dens/post_dens_", filename,".rds"))))
+post_pred_length <- sqrt(length(readRDS(paste0("empirical/results_",dataset,"/post_dens/post_dens_", filename,".rds"))))
 
 from_to <- apply(y, 2, range)
 y_line1 <- seq(from_to[1,1], from_to[2,1], length.out = 2e1)
@@ -51,7 +56,7 @@ for(run in 1:nrow(repulsive_grid)){
   
   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
   
-  all_M[run, ] <- readRDS(paste0("results","fapp_fav","/M_a/M_a_", filename,".rds"))
+  all_M[run, ] <- readRDS(paste0("empirical/results_",dataset,"/M_a/M_a_", filename,".rds"))
   
 }
 
@@ -64,7 +69,7 @@ M.l <- M_grid %>% pivot_longer(cols = -c(1:ncol(repulsive_grid)), names_to = "it
 # Results
 ############################################################################################
 
-dir.create(paste0("results","fapp_fav","/dashboards/"), showWarnings = FALSE, recursive = TRUE)
+dir.create(paste0("empirical/results_",dataset,"/dashboards/"), showWarnings = FALSE, recursive = TRUE)
 
 all_zetas <- unique(repulsive_grid$zeta)
 pps <- list()
@@ -80,7 +85,7 @@ for(run in 1:nrow(repulsive_grid)){
   
   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
   
-  post_pred <-  readRDS(paste0("results","fapp_fav","/post_dens/post_dens_", filename,".rds"))
+  post_pred <-  readRDS(paste0("empirical/results_",dataset,"/post_dens/post_dens_", filename,".rds"))
   
   df <- data.frame(x = y_grid1$Var1, y = y_grid1$Var2, density = post_pred)
   
@@ -95,7 +100,7 @@ for(run in 1:nrow(repulsive_grid)){
   ############################################################################################
   # Binder and VI
   ############################################################################################
-  allocs_samp = readRDS(paste0("results","fapp_fav","/allocs/allocs_", filename,".rds")) 
+  allocs_samp = readRDS(paste0("empirical/results_",dataset,"/allocs/allocs_", filename,".rds")) 
   
   # VI
   
@@ -125,19 +130,17 @@ for(run in 1:nrow(repulsive_grid)){
   # Save individual plots
   ##############################################################################
   
-  pdf(paste0("results","fapp_fav","/dashboards/", "pps_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
+  pdf(paste0("empirical/results_",dataset,"/dashboards/", "pps_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
   print(pps[[run]])
   dev.off()
   
-  pdf(paste0("results","fapp_fav","/dashboards/", "vi_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
+  pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
   print(vi.ggs[[run]])
   dev.off()
   
   ##############################################################################
   # End individual plots
   ##############################################################################
-  
-  
   
   # Binder
   s_binder <-  c(salso(allocs_samp, loss=salso::binder(a=1)))
@@ -168,7 +171,7 @@ for(run in 1:nrow(repulsive_grid)){
     ) 
           ##legend.position = "none") 
    
- pdf(paste0("results","fapp_fav","/dashboards/", "binder_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
+ pdf(paste0("empirical/results_",dataset,"/dashboards/", "binder_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
   print(binder.ggs[[run]])
  dev.off()
   
@@ -212,15 +215,15 @@ for(run in 1:nrow(repulsive_grid)){
  
 }
 
-pdf(paste0("results","fapp_fav","/dashboards/", "M_bar_gfacet.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_gfacet.pdf"), width = 12, height = 10)
 print(M_bar_gfacet)
 dev.off()
 
-pdf(paste0("results","fapp_fav","/dashboards/", "M_bar_zfacet.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_zfacet.pdf"), width = 12, height = 10)
 print(M_bar_zfacet)
 dev.off()
 
-pdf(paste0("results","fapp_fav","/dashboards/", "binder.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "binder.pdf"), width = 12, height = 10)
 
 for(start_index in seq(1, length(pps), by = 6)){
   do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 5)]), ncol=3))
@@ -228,9 +231,27 @@ for(start_index in seq(1, length(pps), by = 6)){
 
 dev.off()
 
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi.pdf"), width = 12, height = 10)
+
+for(start_index in seq(1, length(pps), by = 6)){
+  do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 5)]), ncol=3))
+}
+
+dev.off()
 
 
+# too many clusters
+# zeta = 0.5, gamma = 0
+# too much smoothing
+# zeta = 0.5, gamma = 2
+# right balance:
+# zeta = 2, gamma = 2
+library(patchwork)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "test.pdf"), width = 12, height = 6)
 
+print(binder.ggs[[85]] + binder.ggs[[89]] + binder.ggs[[101]])
+
+dev.off()
 
 
 
@@ -243,7 +264,7 @@ dev.off()
 
 # AntMAN
 
-pp_am <-  readRDS(paste0("results","fapp_fav","/antman/post_dens.rds"))
+pp_am <-  readRDS(paste0("empirical/results_",dataset,"/antman/post_dens.rds"))
 
 df <- data.frame(x = y_grid$Var1, y = y_grid$Var2, density = pp_am)
 
@@ -256,7 +277,7 @@ pp_am <-
   scale_color_viridis_c(option = "plasma") +
   labs(title = paste0("Posterior predictive for AntMAN"))
 
-allocs <- readRDS(paste0("results","fapp_fav","/antman/allocs.rds"))
+allocs <- readRDS(paste0("empirical/results_",dataset,"/antman/allocs.rds"))
 s_vi <- c(salso(allocs, loss=salso::VI(a=1)))
 df <- data.frame(x = y1[,1], y = y1[,2], color = s_vi)
 
@@ -279,7 +300,7 @@ binder_am <-
   labs(title = "Binder estimate for AntMAN", x = "X-axis", y = "Y-axis") +
   theme_minimal() 
 
-M_a_antman <- readRDS(paste0("results","fapp_fav","/antman/M_a.rds"))
+M_a_antman <- readRDS(paste0("empirical/results_",dataset,"/antman/M_a.rds"))
 M_antman.l <- data.frame(zeta = "AntMAN", gamma = 1e-6, dataset = factor(dataset), update = factor("fixed"), alpha = 0.5, iter = 1:n_save, M_a = M_a_antman)
 M.l <- rbind(M.l, M_antman.l)
 
@@ -302,7 +323,7 @@ M_bar <- M.l %>%
 
 
 
-pdf(paste0("results","fapp_fav","/dashboards/", "pps.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "pps.pdf"), width = 12, height = 10)
 
 for(start_index in seq(1, length(pps), by = 6)){
   #do.call(grid.arrange, c(c(pps[start_index:(start_index + 4)], list(pp_am)), ncol=3))
@@ -311,15 +332,15 @@ for(start_index in seq(1, length(pps), by = 6)){
 
 dev.off()
 
-pdf(paste0("results","fapp_fav","/dashboards/", "M_bar_gfacet.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_gfacet.pdf"), width = 12, height = 10)
   print(M_bar_gfacet)
 dev.off()
 
-pdf(paste0("results","fapp_fav","/dashboards/", "M_bar_zfacet.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_zfacet.pdf"), width = 12, height = 10)
   print(M_bar_zfacet)
 dev.off()
 
-pdf(paste0("results","fapp_fav","/dashboards/", "binder.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "binder.pdf"), width = 12, height = 10)
 
 for(start_index in seq(1, length(pps), by = 6)){
   #do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 4)], list(binder_am)), ncol=3))
@@ -329,7 +350,7 @@ for(start_index in seq(1, length(pps), by = 6)){
 dev.off()
 
 
-pdf(paste0("results","fapp_fav","/dashboards/", "vi.pdf"), width = 12, height = 10)
+pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi.pdf"), width = 12, height = 10)
 
 for(start_index in seq(1, length(pps), by = 6)){
   #do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 4)], list(vi_am)), ncol=3))

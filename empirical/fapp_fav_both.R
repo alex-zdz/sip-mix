@@ -1,4 +1,4 @@
-setwd("C:/Users/alexm/NUS Dropbox/Alexander Mozdzen/MARIA-REPULSIVEWEIGHTS/2025/sip-mix/empirical")
+#setwd("C:/Users/alexm/NUS Dropbox/Alexander Mozdzen/MARIA-REPULSIVEWEIGHTS/2025/sip-mix/empirical")
 
 # Load packages
 library(rdist)
@@ -39,9 +39,9 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   library(mvtnorm)
   library(MCMCpack)
   # Source functions:
-  source("../src/rep_mix_main_new.R")
-  source("../src/log_sdir.R")
-  Rcpp::sourceCpp("../src/rcpp_functions.cpp")
+  source("src/rep_mix_main_new.R")
+  source("src/log_sdir.R")
+  Rcpp::sourceCpp("src/rcpp_functions.cpp")
   
   # # Assign variable based on run-id
   zetas_samp <- rep(repulsive_grid$zeta[run], 2)
@@ -53,11 +53,11 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
   
   if(dataset == "bmi_pp_fa"){
-    y <- readRDS("data/bmi_pp_fa.RDS")
+    y <- readRDS("empirical/data/bmi_pp_fa.RDS")
   }else if(dataset == "bmi_pp_fav"){
-    y <- readRDS("data/bmi_pp_fav.RDS")
+    y <- readRDS("empirical/data/bmi_pp_fav.RDS")
   }else if(dataset == "fapp_fav"){
-    y <- readRDS("data/fapp_fav.RDS")
+    y <- readRDS("empirical/data/fapp_fav.RDS")
   }
   
   
@@ -176,8 +176,8 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   
   # Clustering:
   
-  dir.create(paste0("results_",dataset,"/allocs/"), showWarnings = FALSE, recursive = TRUE)
-  saveRDS(results$alloc_out, paste0("results_",dataset,"/allocs/","allocs_",filename,".rds"))
+  dir.create(paste0("empirical/results_",dataset,"/allocs/"), showWarnings = FALSE, recursive = TRUE)
+  saveRDS(results$alloc_out, paste0("empirical/results_",dataset,"/allocs/","allocs_",filename,".rds"))
   
   s_out <- results$alloc_out
   a_cost <- 1
@@ -188,14 +188,14 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   J_binder <- max(s_binder)
   nj_binder <- table(s_binder)
   
-  dir.create(paste0("results_",dataset,"/s_binder/"), showWarnings = FALSE, recursive = TRUE)
-  saveRDS(s_binder, paste0("results_",dataset,"/s_binder/","s_binder_",filename,".rds"))
+  dir.create(paste0("empirical/results_",dataset,"/s_binder/"), showWarnings = FALSE, recursive = TRUE)
+  saveRDS(s_binder, paste0("empirical/results_",dataset,"/s_binder/","s_binder_",filename,".rds"))
   
-  dir.create(paste0("results_",dataset,"/post_dens/"), showWarnings = FALSE, recursive = TRUE)
-  saveRDS(colMeans(results$post_dens_out), paste0("results_",dataset,"/post_dens/","post_dens_",filename,".rds"))
+  dir.create(paste0("empirical/results_",dataset,"/post_dens/"), showWarnings = FALSE, recursive = TRUE)
+  saveRDS(colMeans(results$post_dens_out), paste0("empirical/results_",dataset,"/post_dens/","post_dens_",filename,".rds"))
   
-  dir.create(paste0("results_",dataset,"/M_a/"), showWarnings = FALSE, recursive = TRUE)
-  saveRDS(results$M_a_out, paste0("results_",dataset,"/M_a/","M_a_",filename,".rds"))
+  dir.create(paste0("empirical/results_",dataset,"/M_a/"), showWarnings = FALSE, recursive = TRUE)
+  saveRDS(results$M_a_out, paste0("empirical/results_",dataset,"/M_a/","M_a_",filename,".rds"))
   
 }
 
@@ -207,7 +207,7 @@ cl <- parallel::makeCluster(parallel::detectCores())
 op <- pboptions(type="timer")
 
 # Quick run for testing
-#system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
+system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
 
 n_save = 5e3;  n_burn = 10e3; n_thin = 2
 system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
