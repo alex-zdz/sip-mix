@@ -412,6 +412,8 @@ M <- 3
 #dir.create(paste0("tern_sdir/"), showWarnings = FALSE, recursive = TRUE)
 # The figures are then moved to paper/figures/tern_sdir/unequal_alpha
 setwd("C:/Users/alexander/Dropbox/MARIA-REPULSIVEWEIGHTS/paper/figures/tern_sdir")
+# 2025
+setwd("C:/Users/alexm/NUS Dropbox/Alexander Mozdzen/MARIA-REPULSIVEWEIGHTS/2025/sip-mix/prior_predictive")
 
 # "Unequal" alphas plots
 all_alphas <- matrix(NA, 6, 3)
@@ -448,7 +450,8 @@ for(a in 1:nrow(all_alphas)){
       n_plot <- 100000
       sample_num  <- burn_in + n_plot
       tuning_sd = 1
-      sdir_samples <- sDir_mh(sample_num, alphas =  alphas, gamma = g, starting_value, tuning_sd)
+      #sdir_samples <- sDir_mh(sample_num, alphas =  alphas, gamma = g, starting_value, tuning_sd)
+      sdir_samples <- sDir_mh_new(sample_num, alphas =  alphas, gamma = g, starting_value, tuning_sd)
       colnames(sdir_samples) <- LETTERS[1:3]
       
       
@@ -495,10 +498,6 @@ for(a in 1:nrow(all_alphas)){
       #       plot.title=element_text(size=15), #change font size of plot title
       #       legend.text=element_text(size=15), #change font size of legend text
       #       legend.title=element_text(size=15)) #change font size of legend title
-      
-      
-      
-      
       
       print(tmp)
       
