@@ -1,0 +1,1048 @@
+---
+title: "Analyzing the prior predictive distribution for a grid of repulsion parameters"
+execute:
+  echo: false
+  warning: false
+  cache: false 
+format: 
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    page-layout: full
+    fig-column: page-right
+    fig-width: 25
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+### Load and Source
+
+```{r}
+
+#rm(list = ls())
+library(tidyverse)
+library(plotly)
+library(rdist)
+library(patchwork)
+library(viridis)
+library(salso)
+library(bayesmix)
+library(combinat)
+library(plyr)
+library(reshape2)
+library(brms)
+
+library(AntMAN)
+library(ggsci)
+#source("src/full_rep_mix.R")
+source("src/log_sdir.R")
+```
+
+# For fixed M we can use classic Metropolis-Hastings
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(brms)
+library(rdist)
+
+gammas = c(0,0.5, 1, 1.5, 2)
+alpha_prior <- 1
+sample_num <- 1e3
+thin <- 5
+acrates <- matrix(ncol = length(gammas), nrow = sample_num/thin)
+colnames(acrates) <- gammas
+
+N = 100
+# Initialize a list to store weights for each gamma
+weights_list <- vector("list", length(gammas))
+names(weights_list) <- gammas
+
+M_a_samp_list <- vector("list", length(gammas))
+names(M_a_samp_list) <- gammas
+M_samp <- 4
+#mus_samp = rnorm(M_samp, 0, 1)
+
+
+
+
+for(gamma in gammas){
+    
+    
+    alpha_post <- rep(alpha_prior, M_samp)
+    weights_samp <- brms::rdirichlet(1, rep(alpha_prior, M_samp))
+    weights_trace <- matrix(ncol = M_samp, nrow = sample_num/thin)
+    M_a_samp_trace <- numeric(sample_num/thin)  
+
+    for(m in 1:sample_num){
+        alpha_post <- rep(alpha_prior, M_samp)
+        log_demon <-  sum(2 * gamma * log(c(rdist(c(weights_samp[-1]))))) 
+        w_prop <- brms::rdirichlet(1, alpha_post)
+        log_numer <- sum(2 * gamma * log(c(rdist(c(w_prop[-1]))))) 
+        log_acrate <- min(log_numer - log_demon, 1)
+       if(log(runif(1)) < log_acrate){
+            weights_samp <-  w_prop
+        }
+
+
+        pred_alloc <- sample(M_samp, N, prob = weights_samp, replace = TRUE)
+        y_pred <- rep(NA, N)
+        for(i in 1:N){
+        y_pred[i] <- rnorm(1, mean = 1, sd = sqrt(2))
+        }
+
+        gaps <- (1:M_samp)[!((1:M_samp) %in% pred_alloc)]
+        M_na_samp <- length(gaps)
+        M_a_samp <- M_samp - M_na_samp
+
+          if(m %% thin == 0){
+            n_burn = 0
+            iter_aux <- (m - n_burn) / thin
+            acrates[iter_aux, which(gamma == gammas)] <- exp(log_acrate)
+            weights_trace[iter_aux, ] <- weights_samp
+            M_a_samp_trace[iter_aux] <- M_a_samp  # Save M_a_samp for the current iteration
+          }
+        }
+
+    # Store the weights trace for the current gamma
+    weights_list[[as.character(gamma)]] <- weights_trace
+    M_a_samp_list[[as.character(gamma)]] <- M_a_samp_trace
+}
+
+# Convert acrates to a data frame for easier plotting
+acrates_df <- as.data.frame(acrates)
+
+mean_acrates = colMeans(acrates_df)
+
+acrates_df$iteration <- 1:(sample_num/thin)
+
+# Reshape the data for ggplot
+acrates_long <- acrates_df %>%
+  pivot_longer(cols = -iteration, names_to = "gamma", values_to = "acrate")
+
+
+# Plot using ggplot
+acrates_plot =
+ggplot(acrates_long, aes(x = iteration, y = acrate, color = gamma)) +
+  geom_line() +
+  geom_hline(data = data.frame(gamma = names(mean_acrates), mean_acrate = mean_acrates),
+             aes(yintercept = mean_acrate, color = gamma), linetype = "dashed", size = 1) +
+  geom_text(data = data.frame(gamma = names(mean_acrates), mean_acrate = mean_acrates),
+            aes(x = sample_num / 2 / thin, y = mean_acrates + 0.1, color = gamma, label = paste("Mean:", round(mean_acrate, 3))),
+             vjust = -1, size = 8) +
+            #facet_wrap(gamma ~ ., ncol = 1, labeller = label_both, scales = "fixed") +
+  labs(title = "Acceptance Rates Over Iterations",
+       x = "Iteration",
+       y = "Acceptance Rate") +
+  theme_minimal()
+
+
+# Convert weights_list to a data frame for easier plotting
+weights_df <- do.call(rbind, lapply(names(weights_list), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, weights_list[[gamma]])
+}))
+
+# Reshape the data for ggplot
+weights_long <- weights_df %>%
+  pivot_longer(cols = -c(iteration, gamma), names_to = "weight_index", values_to = "weight_value")
+
+# Plot using ggplot
+weights_plot =
+ggplot(weights_long, aes(x = iteration, y = weight_value, color = weight_index)) +
+  geom_line(size = 1) +  # Increase line size for better visibility
+  facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+  labs(title = "Trace Plots of Weights Over Iterations",
+       x = "Iteration",
+       y = "Weight Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Move legend to bottom for better visibility
+
+
+M_a_samp_df <- do.call(rbind, lapply(names(M_a_samp_list), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, M_a_samp = M_a_samp_list[[gamma]])
+}))
+
+M_a_samp_plot <- ggplot(M_a_samp_df, aes(x = iteration, y = M_a_samp, color = gamma)) +
+  geom_line(size = 1) +
+  facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+  labs(title = "Trace Plots of M_a_samp Over Iterations",
+       x = "Iteration",
+       y = "M_a_samp Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+  labs(title = "Bar Plot of M_a_samp Over Iterations",
+       x = "Iteration",
+       y = "M_a_samp Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
+#   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+#   #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+#   labs(title = "Bar Plot of M_a_samp Over Iterations",
+#        x = "Iteration",
+#        y = "M_a_samp Value") +
+#   theme_minimal() +
+#   theme(legend.position = "bottom")
+
+
+# Arrange the plots in a single view
+library(gridExtra)
+grid.arrange(acrates_plot, weights_plot, M_a_samp_barplot, ncol = 1)
+
+
+
+```
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(brms)
+library(rdist)
+library(gridExtra)
+
+alpha_prior <- 1
+N = 100
+sample_num <- 3e3
+thin <- 5
+gammas <- c(0, 0.5, 1, 1.5, 2)
+# Version for paper
+gammas <- c(0, 1, 3)
+M_samp_values <- 2:10
+
+# Create a grid of all combinations of gamma and M_samp
+param_grid <- expand.grid(gamma = gammas, M_samp = M_samp_values)
+
+# Initialize a nested list to store results for each M_samp and gamma
+results_list <- vector("list", length(M_samp_values))
+names(results_list) <- paste0(M_samp_values)
+
+for (M_samp in M_samp_values) {
+  # Initialize a list to store results for each gamma
+  gamma_results <- vector("list", length(gammas))
+  names(gamma_results) <- paste0("gamma_", gammas)
+  
+  for (gamma in gammas) {
+    # Initialize storage for weights, M_a_samp traces, and acceptance rates
+    weights_trace <- matrix(ncol = M_samp, nrow = sample_num/thin)
+    M_a_samp_trace <- numeric(sample_num/thin)
+    acrates_trace <- numeric(sample_num/thin)
+    
+    # Initialize alpha_post and weights_samp
+    alpha_post <- rep(alpha_prior, M_samp)
+    weights_samp <- brms::rdirichlet(1, alpha_post)
+    
+    for (m in 1:sample_num) {
+      # Update alpha_post and calculate log acceptance rate
+      alpha_post <- rep(alpha_prior, M_samp)
+      log_demon <- sum(2 * gamma * log(c(rdist(c(weights_samp[-1])))))
+      w_prop <- brms::rdirichlet(1, alpha_post)
+      log_numer <- sum(2 * gamma * log(c(rdist(c(w_prop[-1])))))
+      log_acrate <- min(log_numer - log_demon, 1)
+      
+      # Accept or reject the proposal
+      if (log(runif(1)) < log_acrate) {
+        weights_samp <- w_prop
+      }
+      
+      # Sample predictions and calculate M_a_samp
+      pred_alloc <- sample(M_samp, N, prob = weights_samp, replace = TRUE)
+      y_pred <- rnorm(N, mean = 1, sd = sqrt(2))
+      gaps <- (1:M_samp)[!((1:M_samp) %in% pred_alloc)]
+      M_na_samp <- length(gaps)
+      M_a_samp <- M_samp - M_na_samp
+      
+      # Store results every 'thin' iterations
+      if (m %% thin == 0) {
+        iter_aux <- m / thin
+        acrates_trace[iter_aux] <- exp(log_acrate)
+        weights_trace[iter_aux, ] <- weights_samp
+        M_a_samp_trace[iter_aux] <- M_a_samp
+      }
+    }
+    
+    # Store the results for the current gamma
+    gamma_results[[paste0("gamma_", gamma)]] <- list(
+      weights_trace = weights_trace,
+      M_a_samp_trace = M_a_samp_trace,
+      acrates_trace = acrates_trace
+    )
+  }
+  
+  # Store the gamma results for the current M_samp
+  results_list[[M_samp -1]] <- gamma_results
+}
+
+
+########################################################################################
+# Convert results to data frames and plot
+all_triples <- vector("list", length(M_samp_values))
+for (M_samp in M_samp_values) {
+  gamma_results <- results_list[[M_samp -1]]
+  
+  acrates_df <- do.call(rbind, lapply(names(gamma_results), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, acrate = gamma_results[[gamma]]$acrates_trace)
+  }))
+
+  mean_acrate_df <- acrates_df %>%
+    group_by(gamma) %>%
+    summarize(mean_acrate = mean(acrate, na.rm = TRUE))
+
+  # Use this dataframe in the acrates_plot
+  acrates_plot <- ggplot(acrates_df, aes(x = iteration, y = acrate, color = gamma)) +
+    geom_line() +
+    geom_hline(data = mean_acrate_df,
+               aes(yintercept = mean_acrate, color = gamma), linetype = "dashed", size = 1) +
+    geom_text(data = mean_acrate_df,
+              aes(x = sample_num / 2 / thin, y =mean_acrate + 0.1, color = gamma, label = paste("Mean:", round(mean_acrate, 3))),
+              vjust = -1, size = 8) +
+    labs(title = paste("Acceptance Rates Over Iterations for", M_samp),
+         x = "Iteration",
+         y = "Acceptance Rate") +
+    theme_minimal()
+
+  # Convert weights and M_a_samp traces to data frames
+  weights_df <- do.call(rbind, lapply(names(gamma_results), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, gamma_results[[gamma]]$weights_trace)
+  }))
+  
+  M_a_samp_df <- do.call(rbind, lapply(names(gamma_results), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, M_a_samp = gamma_results[[gamma]]$M_a_samp_trace)
+  }))
+  
+  # Reshape the data for ggplot
+  weights_long <- weights_df %>%
+    pivot_longer(cols = -c(iteration, gamma), names_to = "weight_index", values_to = "weight_value")
+  
+  # Plot using ggplot
+  weights_plot <- ggplot(weights_long, aes(x = iteration, y = weight_value, color = weight_index)) +
+    geom_line(size = 1) +
+    facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+    labs(title = paste("Trace Plots of Weights Over Iterations for", M_samp),
+         x = "Iteration",
+         y = "Weight Value") +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+  
+  M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
+    geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+    labs(title = paste("Bar Plot of M_a_samp Over Iterations for", M_samp),
+         x = "M_a_samp Value",
+         y = "Proportion") +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+
+  # Arrange the plots in a single view
+  all_triples[[which(M_samp == M_samp_values)]] <- grid.arrange(acrates_plot, weights_plot, M_a_samp_barplot, ncol = 1)
+}
+
+plot(all_triples[[8]])
+
+``` 
+
+
+
+# Additional alpha loop
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(brms)
+library(rdist)
+library(gridExtra)
+
+alpha_prior <- 1
+N = 100
+sample_num <- 3e3
+thin <- 5
+gammas <- c(0, 0.5, 1, 1.5, 2)
+# Version for paper
+gammas <- c(0, 1, 3)
+M_samp_values <- 2:10
+
+# Create a grid of all combinations of gamma and M_samp
+param_grid <- expand.grid(gamma = gammas, M_samp = M_samp_values)
+
+# Initialize a nested list to store results for each M_samp and gamma
+results_list <- vector("list", length(M_samp_values))
+names(results_list) <- paste0(M_samp_values)
+
+
+alphas <- c(1, 10)
+all_results <- list()  # Store everything here
+
+for (alpha_prior in alphas) {
+  results_list <- vector("list", length(M_samp_values))
+  names(results_list) <- paste0(M_samp_values)
+
+  for (M_samp in M_samp_values) {
+    gamma_results <- vector("list", length(gammas))
+    names(gamma_results) <- paste0("gamma_", gammas)
+    
+    for (gamma in gammas) {
+      weights_trace <- matrix(ncol = M_samp, nrow = sample_num/thin)
+      M_a_samp_trace <- numeric(sample_num/thin)
+      acrates_trace <- numeric(sample_num/thin)
+      min_w_pwd <- numeric(sample_num/thin)
+
+      alpha_post <- rep(alpha_prior, M_samp)
+      weights_samp <- brms::rdirichlet(1, alpha_post)
+      
+      for (m in 1:sample_num) {
+        alpha_post <- rep(alpha_prior, M_samp)
+        log_demon <- sum(2 * gamma * log(c(rdist(c(weights_samp[-1])))))
+        w_prop <- brms::rdirichlet(1, alpha_post)
+        log_numer <- sum(2 * gamma * log(c(rdist(c(w_prop[-1])))))
+        log_acrate <- min(log_numer - log_demon, 1)
+        
+        if (log(runif(1)) < log_acrate) {
+          weights_samp <- w_prop
+        }
+        
+        pred_alloc <- sample(M_samp, N, prob = weights_samp, replace = TRUE)
+        M_a_samp <- length(unique(pred_alloc))
+
+        if (m %% thin == 0) {
+          iter_aux <- m / thin
+          acrates_trace[iter_aux] <- exp(log_acrate)
+          weights_trace[iter_aux, ] <- weights_samp
+          M_a_samp_trace[iter_aux] <- M_a_samp
+          min_w_pwd[iter_aux] <- min(c(rdist(c(weights_samp))))
+        }
+      }
+      
+      gamma_results[[paste0("gamma_", gamma)]] <- list(
+        weights_trace = weights_trace,
+        M_a_samp_trace = M_a_samp_trace,
+        acrates_trace = acrates_trace,
+        min_w_pwd = min_w_pwd
+      )
+    }
+    
+    results_list[[M_samp - 1]] <- gamma_results
+  }
+  
+  all_results[[paste0("alpha_", alpha_prior)]] <- results_list
+}
+
+################################################################################
+# Plots
+
+all_triples <- list()
+
+for (alpha_name in names(all_results)) {
+  alpha_plots <- list()  # Store plots for each M_samp under a given alpha
+  
+  for (M_samp in M_samp_values) {
+    gamma_results <- all_results[[alpha_name]][[as.character(M_samp)]]
+    
+    acrates_df <- do.call(rbind, lapply(names(gamma_results), function(gamma) {
+      data.frame(iteration = 1:(sample_num/thin),
+                 gamma = gamma,
+                 acrate = gamma_results[[gamma]]$acrates_trace)
+    }))
+    
+    mean_acrate_df <- acrates_df %>%
+      group_by(gamma) %>%
+      summarize(mean_acrate = mean(acrate, na.rm = TRUE))
+    
+    acrates_plot <- ggplot(acrates_df, aes(x = iteration, y = acrate, color = gamma)) +
+      geom_line() +
+      geom_hline(data = mean_acrate_df,
+                 aes(yintercept = mean_acrate, color = gamma), linetype = "dashed", size = 1) +
+      geom_text(data = mean_acrate_df,
+                aes(x = sample_num / 2 / thin, y = mean_acrate + 0.1, color = gamma,
+                    label = paste("Mean:", round(mean_acrate, 3))),
+                vjust = -1, size = 4) +
+      labs(title = paste("Acceptance Rates for M_samp =", M_samp, ",", alpha_name),
+           x = "Iteration",
+           y = "Acceptance Rate") +
+      theme_minimal()
+    
+    weights_df <- do.call(rbind, lapply(names(gamma_results), function(gamma) {
+      data.frame(iteration = 1:(sample_num/thin), gamma = gamma,
+                 gamma_results[[gamma]]$weights_trace)
+    }))
+    
+    M_a_samp_df <- do.call(rbind, lapply(names(gamma_results), function(gamma) {
+      data.frame(iteration = 1:(sample_num/thin), gamma = gamma,
+                 M_a_samp = gamma_results[[gamma]]$M_a_samp_trace)
+    }))
+    
+    weights_long <- weights_df %>%
+      pivot_longer(cols = -c(iteration, gamma), names_to = "weight_index", values_to = "weight_value")
+    
+    weights_plot <- ggplot(weights_long, aes(x = iteration, y = weight_value, color = weight_index)) +
+      geom_line(size = 1) +
+      facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+      labs(title = paste("Trace Plots of Weights for M_samp =", M_samp, ",", alpha_name),
+           x = "Iteration",
+           y = "Weight Value") +
+      theme_minimal() +
+      theme(legend.position = "bottom")
+    
+    M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
+      geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+      labs(title = paste("Bar Plot of M_a_samp for M_samp =", M_samp, ",", alpha_name),
+           x = "M_a_samp Value",
+           y = "Proportion") +
+      theme_minimal() +
+      theme(legend.position = "bottom")
+    
+    alpha_plots[[as.character(M_samp)]] <- grid.arrange(acrates_plot, weights_plot, M_a_samp_barplot, ncol = 1)
+  }
+  
+  all_triples[[alpha_name]] <- alpha_plots
+}
+
+all_triples[[1]][[1]]
+
+```
+
+# Plot M_samp
+
+```{r}
+
+combined_data <- list()
+
+# Loop over alpha, M_samp, and gamma
+for (alpha_name in names(all_results)) {
+  alpha_results <- all_results[[alpha_name]]
+  
+  for (M_samp in names(alpha_results)) {
+    gamma_results <- alpha_results[[M_samp]]
+    
+    for (gamma in names(gamma_results)) {
+      M_a_samp_trace <- gamma_results[[gamma]]$M_a_samp_trace
+      min_w_pwd <- gamma_results[[gamma]]$min_w_pwd
+      
+      df <- data.frame(
+        iter = 1:(sample_num / thin),
+        alpha = as.numeric(sub("alpha_", "", alpha_name)),
+        gamma = as.numeric(sub("gamma_", "", gamma)),
+        M_samp = as.numeric(sub("M_", "", M_samp)),
+        M_a_samp = M_a_samp_trace,
+        min_w_pwd = min_w_pwd
+      )
+      
+      combined_data[[paste0(alpha_name, "_", M_samp, "_", gamma)]] <- df
+    }
+  }
+}
+
+# Combine all data frames into a single data frame
+final_df <- do.call(rbind, combined_data)
+
+# Check structure
+print(head(final_df))
+
+# Bar plot of M_a_samp
+ggplot(final_df, aes(x = M_a_samp, fill = as.factor(gamma))) +
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  facet_wrap( ~ M_samp + alpha, labeller = label_both, ncol = 2) +
+  labs(title = "Bar Plot of M_a_samp Over Iterations",
+       x = "M_a_samp Value",
+       y = "Proportion",
+       fill = "Gamma") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+```	
+
+# Plot for paper
+
+```{r}
+
+library(tidyverse)
+library(ggsci)  # for scale_fill_npg()
+
+# Define prior over M_samp: shifted Poisson
+lambda <- 3
+max_M <- max(final_df$M_samp)
+
+prior_df <- tibble(
+  M_samp = 1:max_M,
+  prior_weight = dpois(M_samp - 1, lambda)
+) %>%
+  mutate(prior_weight = prior_weight / sum(prior_weight))  # normalize
+
+# Estimate p(M_a | M_samp, gamma, alpha)
+conditional_df <- final_df %>%
+  group_by(alpha, gamma, M_samp, M_a_samp) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(alpha, gamma, M_samp) %>%
+  mutate(prob = count / sum(count))
+
+# Merge with prior on M_samp
+weighted_df <- conditional_df %>%
+  left_join(prior_df, by = "M_samp") %>%
+  mutate(weighted_prob = prob * prior_weight)
+
+# Sum over M_samp to get p(M_a | gamma, alpha)
+prior_predictive_df <- weighted_df %>%
+  group_by(alpha, gamma, M_a_samp) %>%
+  summarise(prior_predictive = sum(weighted_prob), .groups = "drop")
+
+# Plot: gamma as fill, alpha as facet
+prior_predictive_df %>%
+  filter(gamma %in% c(0, 1, 3)) %>%
+  ggplot(aes(x = M_a_samp, y = prior_predictive, fill = factor(gamma))) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ alpha, labeller = label_both) +
+  labs(
+    x = expression(paste(M[a])),
+    y = expression(paste(Pr(M[a]))),
+    fill = expression(gamma)
+  ) +
+  scale_fill_npg() +
+  theme_minimal()
+
+# Final version
+ma_range <- range(prior_predictive_df$M_a_samp)
+
+
+
+pdf("prior_predictive/M_a_bar_alpha_1.pdf", width = 10, height = 6)
+
+prior_predictive_df %>%
+  filter(alpha %in% c(1)) %>%
+  filter(gamma %in% c(0, 1, 3)) %>%
+  ggplot(aes(x = M_a_samp, y = prior_predictive, fill = factor(gamma))) +
+  geom_col(position = "dodge", width = 0.6) +
+  #facet_wrap(~ alpha, labeller = label_both) +
+  labs(
+    x = expression(M[a]),
+    y = expression(Pr(M[a])),
+    fill = expression(gamma)
+  ) +
+  scale_fill_npg() +
+  scale_x_continuous(breaks = seq(ma_range[1], ma_range[2], by = 1)) +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text = element_text(size = 16),
+    axis.title = element_text(size = 18),
+    strip.text = element_text(size = 18),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.position = "right",
+    #panel.grid = element_blank(),  # remove background grid
+    #axis.line = element_line(size = 0.5),
+    #axis.ticks = element_line(size = 0.5)
+  )
+
+dev.off()
+
+pdf("prior_predictive/M_a_bar_alpha_10.pdf", width = 10, height = 6)
+
+prior_predictive_df %>%
+  filter(alpha %in% c(10)) %>%
+  filter(gamma %in% c(0, 1, 3)) %>%
+  ggplot(aes(x = M_a_samp, y = prior_predictive, fill = factor(gamma))) +
+  geom_col(position = "dodge", width = 0.6) +
+  #facet_wrap(~ alpha, labeller = label_both) +
+  labs(
+    x = expression(M[a]),
+    y = expression(Pr(M[a])),
+    fill = expression(gamma)
+  ) +
+  scale_fill_npg() +
+  scale_x_continuous(breaks = seq(ma_range[1], ma_range[2], by = 1)) +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text = element_text(size = 16),
+    axis.title = element_text(size = 18),
+    strip.text = element_text(size = 18),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.position = "right",
+    #panel.grid = element_blank(),  # remove background grid
+    #axis.line = element_line(size = 0.5),
+    #axis.ticks = element_line(size = 0.5)
+  )
+
+dev.off()
+
+```
+
+```{r}
+
+# Range of x values to define axis ticks (optional)
+pwd_range <- range(final_df$min_w_pwd, na.rm = TRUE)
+
+# PDF for alpha = 1
+#pdf("prior_predictive/min_w_pwd_density_alpha_1.pdf", width = 10, height = 6)
+
+final_df %>%
+  filter(alpha == 1, gamma %in% c(0, 1, 3)) %>%
+  ggplot(aes(x = min_w_pwd, fill = factor(gamma), color = factor(gamma))) +
+  geom_density(alpha = 0.4, size = 1) +
+  labs(
+    x = "Minimum Pairwise Distance (min_w_pwd)",
+    y = "Density",
+    fill = expression(gamma),
+    color = expression(gamma)
+  ) +
+  scale_fill_npg() +
+  scale_color_npg() +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text = element_text(size = 16),
+    axis.title = element_text(size = 18),
+    strip.text = element_text(size = 18),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.position = "right"
+  )
+
+dev.off()
+
+
+
+```
+
+
+# Prior density plot
+
+```{r}
+
+
+
+
+
+
+```	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Rejection sampling for varying M ( unused)
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+
+gammas = c(0, 1, 3)
+alpha_prior <- 0.1
+sample_num <- 3e2
+thin <- 5
+acrates <- matrix(ncol = length(gammas), nrow = sample_num/thin)
+colnames(acrates) <- gammas
+
+
+
+
+N = 100
+# Initialize a list to store weights for each gamma
+weights_list <- vector("list", length(gammas))
+names(weights_list) <- gammas
+M_a_samp_list <- vector("list", length(gammas))
+names(M_a_samp_list) <- gammas
+rep_num = 1e3
+
+# Convert acrates to a data frame for easier plotting
+acrates_df <- as.data.frame(acrates)
+
+mean_acrates = colMeans(acrates_df)
+
+acrates_df$iteration <- 1:(sample_num/thin)
+
+# Reshape the data for ggplot
+acrates_long <- acrates_df %>%
+  pivot_longer(cols = -iteration, names_to = "gamma", values_to = "acrate")
+
+
+# Plot using ggplot
+acrates_plot =
+ggplot(acrates_long, aes(x = iteration, y = acrate, color = gamma)) +
+  geom_line() +
+  geom_hline(data = data.frame(gamma = names(mean_acrates), mean_acrate = mean_acrates),
+             aes(yintercept = mean_acrate, color = gamma), linetype = "dashed", size = 1) +
+  geom_text(data = data.frame(gamma = names(mean_acrates), mean_acrate = mean_acrates),
+            aes(x = sample_num / 2 / thin, y = mean_acrates + 0.1, color = gamma, label = paste("Mean:", round(mean_acrate, 3))),
+             vjust = -1, size = 8) +
+            #facet_wrap(gamma ~ ., ncol = 1, labeller = label_both, scales = "fixed") +
+  labs(title = "Acceptance Rates Over Iterations",
+       x = "Iteration",
+       y = "Acceptance Rate") +
+  theme_minimal()
+
+# Convert weights_list to a data frame for easier plotting
+weights_df <- do.call(rbind, lapply(names(weights_list), function(gamma) {
+    weights_gamma <- weights_list[[gamma]]
+    do.call(rbind, lapply(seq_along(weights_gamma), function(iter) {
+        data.frame(iteration = iter, gamma = gamma, weights_gamma[[iter]])
+    }))
+}))
+# Initialize alphas
+alphas <- c(0.01, 0.1, 1)
+
+# Initialize lists to store results for each alpha
+weights_list_alpha <- list()
+M_a_samp_list_alpha <- list()
+acrates_alpha <- list()
+
+# Loop over each alpha
+for (alpha in alphas) {
+  # Initialize lists to store results for each gamma within the current alpha
+  weights_list <- list()
+  M_a_samp_list <- list()
+  acrates <- matrix(0, nrow = sample_num / thin, ncol = length(gammas))
+  colnames(acrates) <- as.character(gammas)
+
+  # Existing loop over gamma
+  for(gamma in gammas){
+    print(paste0("gamma = ", gamma))
+    # starting values
+    M_samp <- 4
+    alpha_post <- rep(alpha_prior, M_samp)
+    weights_samp <- brms::rdirichlet(1, rep(alpha_prior, M_samp))
+    #weights_trace <- matrix(ncol = M_samp, nrow = sample_num/thin)
+    M_a_samp_trace <- numeric(sample_num/thin)  
+    weights_trace_list <- vector("list", sample_num/thin)
+
+    for(m in 1:sample_num){
+        if(m %% 100 == 0){
+            print(m)
+        }
+        accepted = FALSE
+        #while(!accepted){
+        for(rn in 1:rep_num){
+          w_prop <- brms::rdirichlet(1, rep(alpha_prior, M_samp))
+          #print(paste0("w_prop = ", paste(w_prop, collapse = ", ")))
+          log_numer <- sum(2 * gamma * log(c(rdist(c(w_prop[-1]))))) 
+          #print(paste0("log_numer = ", log_numer))
+          log_acrate <- min(log_numer, 1)
+          if(log(runif(1)) < log_acrate){
+              weights_samp <-  w_prop
+              accepted = TRUE
+              break
+          }
+        }
+
+        pred_alloc <- sample(M_samp, N, prob = weights_samp, replace = TRUE)
+        y_pred <- rep(NA, N)
+        for(i in 1:N){
+        y_pred[i] <- rnorm(1, mean = 1, sd = sqrt(2))
+        }
+
+        gaps <- (1:M_samp)[!((1:M_samp) %in% pred_alloc)]
+        M_na_samp <- length(gaps)
+        M_a_samp <- M_samp - M_na_samp
+
+          if(m %% thin == 0){
+            n_burn = 0
+            iter_aux <- (m - n_burn) / thin
+            acrates[iter_aux, which(gamma == gammas)] <- exp(log_acrate)
+            weights_trace_list[[iter_aux]] <- weights_samp
+            M_a_samp_trace[iter_aux] <- M_a_samp  # Save M_a_samp for the current iteration
+          }
+        }
+
+    # Store the weights trace for the current gamma
+    weights_list[[as.character(gamma)]] <- weights_trace_list
+    M_a_samp_list[[as.character(gamma)]] <- M_a_samp_trace
+}
+
+
+  # Store results for the current alpha
+  weights_list_alpha[[as.character(alpha)]] <- weights_list
+  M_a_samp_list_alpha[[as.character(alpha)]] <- M_a_samp_list
+  acrates_alpha[[as.character(alpha)]] <- acrates
+}
+
+# Convert acrates_alpha to a data frame for easier plotting
+acrates_df_alpha <- do.call(rbind, lapply(names(acrates_alpha), function(alpha) {
+  acrates_df <- as.data.frame(acrates_alpha[[alpha]])
+  acrates_df$iteration <- 1:(sample_num/thin)
+  acrates_df$alpha <- alpha
+  acrates_df
+}))
+
+# Reshape the data for ggplot
+acrates_long_alpha <- acrates_df_alpha %>%
+  pivot_longer(cols = -c(iteration, alpha), names_to = "gamma", values_to = "acrate")
+
+# Plot using ggplot
+acrates_plot_alpha =
+ggplot(acrates_long_alpha, aes(x = iteration, y = acrate, color = gamma)) +
+  geom_line() +
+  facet_wrap(~ alpha, ncol = 1, labeller = label_both) +
+  labs(title = "Acceptance Rates Over Iterations",
+       x = "Iteration",
+       y = "Acceptance Rate") +
+  theme_minimal()
+
+
+ggplot(acrates_long_alpha, aes(x = iteration, y = acrate, color = alpha)) +
+geom_line() +
+facet_wrap(~ gamma, ncol = 1, labeller = label_both, scales = "free") +
+labs(title = "Acceptance Rates Over Iterations",
+      x = "Iteration",
+      y = "Acceptance Rate") +
+theme_minimal()
+
+
+# Convert M_a_samp_list_alpha to a data frame for easier plotting
+M_a_samp_df_alpha <- do.call(rbind, lapply(names(M_a_samp_list_alpha), function(alpha) {
+  M_a_samp_list <- M_a_samp_list_alpha[[alpha]]
+  do.call(rbind, lapply(names(M_a_samp_list), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), alpha = alpha, gamma = gamma, M_a_samp = M_a_samp_list[[gamma]])
+  }))
+}))
+
+# Plot M_a_samp using ggplot
+M_a_samp_plot_alpha <- ggplot(M_a_samp_df_alpha, aes(x = iteration, y = M_a_samp, color = gamma)) +
+  geom_line(size = 1) +
+  facet_wrap(alpha ~ gamma, ncol = 1, labeller = label_both) +
+  labs(title = "Trace Plots of M_a_samp Over Iterations",
+       x = "Iteration",
+       y = "M_a_samp Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Bar plot of M_a_samp
+M_a_samp_barplot_alpha <- ggplot(M_a_samp_df_alpha, aes(x = M_a_samp, fill = gamma)) +
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  facet_wrap(~ alpha, ncol = 1, labeller = label_both) +
+  labs(title = "Bar Plot of M_a_samp Over Iterations",
+       x = "Iteration",
+       y = "M_a_samp Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+M_a_samp_df <- do.call(rbind, lapply(names(M_a_samp_list), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, M_a_samp = M_a_samp_list[[gamma]])
+}))
+
+M_a_samp_plot <- ggplot(M_a_samp_df, aes(x = iteration, y = M_a_samp, color = gamma)) +
+  geom_line(size = 1) +
+  facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+  labs(title = "Trace Plots of M_a_samp Over Iterations",
+       x = "Iteration",
+       y = "M_a_samp Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+  labs(title = "Bar Plot of M_a_samp Over Iterations",
+       x = "Iteration",
+       y = "M_a_samp Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+# Arrange the plots in a single view
+library(gridExtra)
+grid.arrange(acrates_plot_alpha, M_a_samp_barplot_alpha, ncol = 1)
+
+#weights_plot, 
+
+```	  
+
+```{r}
+
+for(rn in 1:rep_num){
+  w_prop <- brms::rdirichlet(1, rep(alpha_prior, M_samp))
+  w_prop
+  c(rdist(c(w_prop[-1])))
+  c(rdist(c(w_prop)))
+  #print(paste0("w_prop = ", paste(w_prop, collapse = ", ")))
+  log_numer <- sum(2 * gamma * log(c(rdist(c(w_prop[-1]))))) 
+  #print(paste0("log_numer = ", log_numer))
+  log_acrate <- min(log_numer, 1)
+  if(log(runif(1)) < log_acrate){
+      weights_samp <-  w_prop
+      accepted = TRUE
+      break
+  }
+}
+
+w_prop1 <- brms::rdirichlet(1, rep(0.01, M_samp))
+w_prop1
+c(rdist(c(w_prop1[-1])))
+log(c(rdist(c(w_prop1[-1]))))
+sum(2 * gamma * log(c(rdist(c(w_prop1[-1]))))) 
+
+w_prop2 <- brms::rdirichlet(1, rep(1, M_samp))
+w_prop2
+c(rdist(c(w_prop2[-1])))
+log(c(rdist(c(w_prop2[-1]))))
+sum(2 * gamma * log(c(rdist(c(w_prop2[-1]))))) 
+
+
+```
+
+
+```{r}
+library(nloptr)
+
+repulsion_term <- function(w, gamma = 1) {
+  # Safeguard: ensure valid probability vector
+  if (any(is.na(w)) || any(w <= 0) || abs(sum(w) - 1) > 1e-6) {
+    return(1e6)  # large penalty for invalid points
+  }
+
+  # Compute pairwise differences
+  diffs <- abs(outer(w, w, "-"))
+  lower_tri_diffs <- diffs[lower.tri(diffs)]
+
+  # Avoid log(0) by adding a small epsilon
+  if (any(lower_tri_diffs <= 1e-10)) return(1e6)
+
+  return(-2 * gamma * sum(log(lower_tri_diffs)))  # negative log of product
+}
+
+# Starting point
+w0 <- c(0.6, 0.3, 0.1)
+
+w0 <- c(0.5, 0.3, 0.1, 0.05, 0.05)
+M <- length(w0)
+# Run optimization
+result <- nloptr(
+  x0 = w0,
+  eval_f = function(w) repulsion_term(w, gamma = 1),
+  lb = rep(1e-4, M),
+  ub = rep(1 - 1e-4, M),
+  eval_g_eq = function(w) sum(w) - 1,
+  opts = list("algorithm" = "NLOPT_LN_COBYLA", "xtol_rel" = 1e-8, "maxeval" = 1000)
+)
+
+# Output
+w_opt <- result$solution
+max_repulsion <- exp(-result$objective / (2 * 1))  # invert the log scale
+cat("Optimal weights:", round(w_opt, 4), "\n")
+cat("Max repulsion term:", round(max_repulsion, 6), "\n")
+
+
+```	  
+
