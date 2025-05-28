@@ -24,8 +24,12 @@ colnames(repulsive_grid) <- c("gamma", "zeta", "dataset", "update", "alpha")
 dir.create(paste0("grid/"), showWarnings = FALSE, recursive = TRUE)
 saveRDS(repulsive_grid, paste0("grid/","mother_child_bmi_grid.rds"))
 
+n_save = 100;n_burn = 100;n_thin = 1
+
+
 grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   
+  # tryCatch({
   #setwd("C:/Users/alexander/Dropbox/MARIA-REPULSIVEWEIGHTS/Code/mixtures/fully_repulsive/repulsion_prior/SBe_prior/cluster/parallel_tryouts")
   library(rdist)
   library(brms)
@@ -53,7 +57,7 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   
   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
   
-  y <- readRDS(paste0("empirical/data/", dataset, ".rds"))
+  y <- as.matrix(readRDS(paste0("empirical/data/", dataset, ".rds")))
   # Set C for C for now
   C = 3
   D = 2
@@ -159,14 +163,24 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   #########################################################################
   set.seed(1)
   
-  startt <- Sys.time()
+  # startt <- Sys.time()
   
-  results <- rep_mix_main(y, updates = updates, hyperparameters = hyperparameters , starting_values = starting_values,
+  # results <- rep_mix_main(y, updates = updates, hyperparameters = hyperparameters , starting_values = starting_values,
+  #                                   n_save = n_save, n_burn = n_burn, n_thin = n_thin)
+  
+  # endt <-  Sys.time() - startt 
+  # endt
+ 
+    startt <- Sys.time()
+  
+    results <- rep_mix_main(y, updates = updates, hyperparameters = hyperparameters , starting_values = starting_values,
                                     n_save = n_save, n_burn = n_burn, n_thin = n_thin)
   
-  endt <-  Sys.time() - startt 
-  endt
-  
+    endt <-  Sys.time() - startt 
+    endt
+    
+ 
+
   # Clustering:
   
   dir.create(paste0("empirical/results_",dataset,"/allocs/"), showWarnings = FALSE, recursive = TRUE)
@@ -190,6 +204,11 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   dir.create(paste0("empirical/results_",dataset,"/M_a/"), showWarnings = FALSE, recursive = TRUE)
   saveRDS(results$M_a_out, paste0("empirical/results_",dataset,"/M_a/","M_a_",filename,".rds"))
   
+  #  }, error = function(e) {
+  #   message("Error at run = ", run, ": ", conditionMessage(e))
+  #    list(result = NULL, error = conditionMessage(e), runtime = NA, run = run)
+  # })
+
 }
 
 library(pbapply)
@@ -202,11 +221,20 @@ op <- pboptions(type="timer")
 # Quick run for testing
 system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
 
-n_save = 5e3;  n_burn = 10e3; n_thin = 2
-#system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
+# safe_grid_eval_debug <- function(i, repulsive_grid, n_save, n_burn, n_thin) {
+#   message("Running i = ", i)
+#   tryCatch({
+#     safe_grid_eval(i, repulsive_grid, n_save, n_burn, n_thin)
+#   }, error = function(e) {
+#     message("Error at i = ", i, ": ", conditionMessage(e))
+#     return(NULL)
+#   })
+# }
+#system.time(pblapply(1:nrow(repulsive_grid), safe_grid_eval_debug, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
 
-#system.time(pblapply(which(repulsive_grid$dataset == "bmi_pp_fav"), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
-#system.time(pblapply(which(repulsive_grid$zeta == 3), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
+
+n_save = 5e3;  n_burn = 10e3; n_thin = 2
+system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
 
 parallel::stopCluster(cl)
 
