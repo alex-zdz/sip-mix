@@ -5,23 +5,24 @@ library(rdist)
 library(brms)
 library(salso)
 
+
 # Create grid
 all_gammas <- c(0, 0.1, 0.5, 1, 2, 5)
 all_zetas <- c(0.001, 0.1, 0.5, 1, 2, 3 )
-#all_zetas <- c(0.001, 0.1, 0.5, 1, 2, 3, 5)
-all_datasets <- c("bmi_pp_fa", "bmi_pp_fav")
 
-# 01.04.2025 trying the food-avoidance food-approach dataset:
-all_datasets <- c("fapp_fav")
-all_datasets <- c("bmi_pp_fa")
+all_gammas <- c(0, 0.5, 1, 2)
+all_zetas <- c(0.001, 0.1, 0.5, 1, 2)
+
+#all_zetas <- c(0.001, 0.1, 0.5, 1, 2, 3, 5)
+all_datasets <- c("m_bmi_ch_bmi_w07", "m_bmi_ch_bmi_w10", "m_bmi_ch_bmi_w12", "m_bmi_ch_bmi_w14")
 
 all_updates <- c("fixed")
-all_alphas <- c( 1, 3, 5) # 0. already run
+all_alphas <- c( 1, 5) # 0. already run
 repulsive_grid <- expand.grid(all_gammas, all_zetas, all_datasets, all_updates, all_alphas)
 colnames(repulsive_grid) <- c("gamma", "zeta", "dataset", "update", "alpha")
 
 dir.create(paste0("grid/"), showWarnings = FALSE, recursive = TRUE)
-saveRDS(repulsive_grid, paste0("grid/","repulsive_grid.rds"))
+saveRDS(repulsive_grid, paste0("grid/","mother_child_bmi_grid.rds"))
 
 grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   
@@ -52,15 +53,7 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   
   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
   
-  if(dataset == "bmi_pp_fa"){
-    y <- readRDS("empirical/data/bmi_pp_fa.RDS")
-  }else if(dataset == "bmi_pp_fav"){
-    y <- readRDS("empirical/data/bmi_pp_fav.RDS")
-  }else if(dataset == "fapp_fav"){
-    y <- readRDS("empirical/data/fapp_fav.RDS")
-  }
-  
-  
+  y <- readRDS(paste0("empirical/data/", dataset, ".rds"))
   # Set C for C for now
   C = 3
   D = 2
@@ -210,7 +203,7 @@ op <- pboptions(type="timer")
 system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
 
 n_save = 5e3;  n_burn = 10e3; n_thin = 2
-system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
+#system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
 
 #system.time(pblapply(which(repulsive_grid$dataset == "bmi_pp_fav"), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
 #system.time(pblapply(which(repulsive_grid$zeta == 3), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
