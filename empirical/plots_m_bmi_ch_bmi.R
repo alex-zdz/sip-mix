@@ -79,18 +79,6 @@ for(run in 1:nrow(repulsive_grid)){
   
   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
   
-  post_pred <-  readRDS(paste0("empirical/results_",dataset,"/post_dens/post_dens_", filename,".rds"))
-  
-  df <- data.frame(x = y_grid1$Var1, y = y_grid1$Var2, density = post_pred)
-  
-  pps[[run]] <- ggplot(df, aes(x = x, y = y)) +
-    geom_tile(aes(fill = density)) +
-    geom_point(data = as.data.frame(y), aes(x = V1, y = V2 ), color = "black") +
-    geom_contour(aes(z = density, color = ..level..), bins = 10, size = 0.75) +
-    scale_fill_viridis_c()+
-    scale_color_viridis_c(option = "plasma") +
-    labs(title = paste0("Posterior predictive for zeta = ", zeta_samp, " and gamma = ", gamma_samp, " alpha = ", alpha_samp))
-  
   ############################################################################################
   # Binder and VI
   ############################################################################################
@@ -240,7 +228,7 @@ dev.off()
 # zeta = 0.5, gamma = 2
 # right balance:
 # zeta = 2, gamma = 2
-library(patchwork)
+
 pdf(paste0("empirical/results_",dataset,"/dashboards/", "test.pdf"), width = 12, height = 6)
 
 print(binder.ggs[[85]] + binder.ggs[[89]] + binder.ggs[[101]])
@@ -248,72 +236,6 @@ print(binder.ggs[[85]] + binder.ggs[[89]] + binder.ggs[[101]])
 dev.off()
 
 
-
-
-
-
-
-
-
-
-# AntMAN
-
-pp_am <-  readRDS(paste0("empirical/results_",dataset,"/antman/post_dens.rds"))
-
-df <- data.frame(x = y_grid$Var1, y = y_grid$Var2, density = pp_am)
-
-pp_am <- 
-  ggplot(df, aes(x = x, y = y)) +
-  geom_tile(aes(fill = density)) +
-  geom_point(data = as.data.frame(y1), aes(x = V1 , y = V2 ), color = "black") +
-  geom_contour(aes(z = density, color = ..level..), bins = 10, size = 0.75) +
-  scale_fill_viridis_c()+
-  scale_color_viridis_c(option = "plasma") +
-  labs(title = paste0("Posterior predictive for AntMAN"))
-
-allocs <- readRDS(paste0("empirical/results_",dataset,"/antman/allocs.rds"))
-s_vi <- c(salso(allocs, loss=salso::VI(a=1)))
-df <- data.frame(x = y1[,1], y = y1[,2], color = s_vi)
-
-vi_am <- 
-  ggplot() +
-  geom_point(data = df, aes(x = x, y = y, color = factor(color)),  size = 2) +
-  geom_encircle(data = df, aes(x = x, y = y, group = color, fill = factor(color)),
-                size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-  labs(title = "VI estimate for AntMAN", x = "X-axis", y = "Y-axis") +
-  theme_minimal() 
-
-s_binder <-  c(salso(allocs, loss=salso::binder(a=1)))
-df <- data.frame(x = y1[,1], y = y1[,2], color = s_binder)
-
-binder_am <- 
-  ggplot() +
-  geom_point(data = df, aes(x = x, y = y, color = factor(color)),  size = 2) +
-  geom_encircle(data = df, aes(x = x, y = y, group = color, fill = factor(color)),
-                size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-  labs(title = "Binder estimate for AntMAN", x = "X-axis", y = "Y-axis") +
-  theme_minimal() 
-
-M_a_antman <- readRDS(paste0("empirical/results_",dataset,"/antman/M_a.rds"))
-M_antman.l <- data.frame(zeta = "AntMAN", gamma = 1e-6, dataset = factor(dataset), update = factor("fixed"), alpha = 0.5, iter = 1:n_save, M_a = M_a_antman)
-M.l <- rbind(M.l, M_antman.l)
-
-M_bar <- M.l %>% 
-  filter(dataset == !!dataset, alpha == 0.5) %>% 
-  mutate(zeta = as.factor(zeta), gamma = as.factor(gamma), iter = as.numeric(iter), alpha = as.factor(alpha)) %>% 
-  ggplot(aes(x =  M_a, fill =  zeta)) + 
-  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(width = 0.5, preserve = "single")) + 
-  scale_x_continuous( breaks = min(M.l$M_a):max(M.l$M_a)) +
-  theme_bw() +
-  ggtitle(paste0("")) +
-  xlab("")+
-  ylab("") +
-  theme(text=element_text(size=20), #change font size of all text
-        axis.text=element_text(size=20), #change font size of axis text
-        axis.title=element_text(size=20), #change font size of axis titles
-        plot.title=element_text(size=20), #change font size of plot title
-        legend.text=element_text(size=25), #change font size of legend text
-        legend.title=element_text(size=25)) #change font size of legend title
 
 
 

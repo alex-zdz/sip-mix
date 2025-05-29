@@ -35,6 +35,13 @@ bmi_data <- all_data[, c("MGD05BMIP", "CWH05WBZ", "CWH06WBZ", "CWH07WBZ", "CWH08
                          "CWH20WBZ", "CWH21WBZ", "CWH22WBZ", "CWH23WBZ", "CWH24WBZ", 
                          "CWH26WBZ", "CWH28WBZ", "CWH30WBZ")]
 
+head(bmi_data)
+
+sum(is.na(bmi_data$MGD05BMIP))
+
+bmi_data_clean <- na.omit(bmi_data)
+
+
 # Plot scatterplots of MGD05BMIP with each of the other columns
 par(mfrow = c(4, 6))  # Set up the plotting area to have multiple plots
 for (col in names(bmi_data)[-1]) {
@@ -48,6 +55,8 @@ library(ggplot2)
 # Reshape the data for ggplot
 bmi_data_long <- reshape2::melt(bmi_data, id.vars = "MGD05BMIP")
 
+head(bmi_data_long )
+
 # Create scatterplots using ggplot
 ggplot(bmi_data_long, aes(x = MGD05BMIP, y = value)) +
   geom_point() +
@@ -58,17 +67,24 @@ ggplot(bmi_data_long, aes(x = MGD05BMIP, y = value)) +
 
   # Extract data pairs for the 3rd, 5th, 7th, and 9th plot
   data_pairs <- list(
-    plot3 = bmi_data[, c("MGD05BMIP", names(bmi_data)[3])],
-    plot5 = bmi_data[, c("MGD05BMIP", names(bmi_data)[5])],
-    plot7 = bmi_data[, c("MGD05BMIP", names(bmi_data)[7])],
-    plot9 = bmi_data[, c("MGD05BMIP", names(bmi_data)[9])]
+    m05ch07 = bmi_data[, c("MGD05BMIP", "CWH07WBZ")],
+    m05ch10 = bmi_data[, c("MGD05BMIP", "CWH10WBZ")],
+    m05ch12 = bmi_data[, c("MGD05BMIP", "CWH12WBZ")],
+    m05ch14 = bmi_data[, c("MGD05BMIP", "CWH14WBZ")]
   )
-  
+
+  # Omit NAs from each data pair separately
+  data_pairs$m05ch07 <- na.omit(data_pairs$m05ch07)
+  data_pairs$m05ch10 <- na.omit(data_pairs$m05ch10)
+  data_pairs$m05ch12 <- na.omit(data_pairs$m05ch12)
+  data_pairs$m05ch14 <- na.omit(data_pairs$m05ch14)
+
   # Save each data pair as an RDS file
-  saveRDS(data_pairs$plot3, file = "empirical/data/plot3_data.rds")
-  saveRDS(data_pairs$plot5, file = "empirical/data/plot5_data.rds")
-  saveRDS(data_pairs$plot7, file = "empirical/data/plot7_data.rds")
-  saveRDS(data_pairs$plot9, file = "empirical/data/plot9_data.rds")
+  saveRDS(data_pairs$m05ch07, file = "empirical/data/m_bmi_ch_bmi_w07.rds")
+  saveRDS(data_pairs$m05ch10, file = "empirical/data/m_bmi_ch_bmi_w10.rds")
+  saveRDS(data_pairs$m05ch12, file = "empirical/data/m_bmi_ch_bmi_w12.rds")
+  saveRDS(data_pairs$m05ch14, file = "empirical/data/m_bmi_ch_bmi_w14.rds")
+  
 
 
 

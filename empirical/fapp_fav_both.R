@@ -1,5 +1,3 @@
-#setwd("C:/Users/alexm/NUS Dropbox/Alexander Mozdzen/MARIA-REPULSIVEWEIGHTS/2025/sip-mix/empirical")
-
 # Load packages
 library(rdist)
 library(brms)
