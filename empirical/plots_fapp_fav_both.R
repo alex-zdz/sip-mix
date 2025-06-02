@@ -45,23 +45,23 @@ y_line1 <- seq(from_to[1,1], from_to[2,1], length.out = 2e1)
 y_line2 <- seq(from_to[1,2], from_to[2,2], length.out = 2e1)
 y_grid1 <- expand.grid(y_line1, y_line2)
 
-all_M <- matrix(NA, nrow(repulsive_grid), n_save)
-for(run in 1:nrow(repulsive_grid)){
-  
-  # Assign variable based on run-id
-  zeta_samp <- repulsive_grid$zeta[run]
-  gamma_samp <- repulsive_grid$gamma[run]
-  dataset <- repulsive_grid$dataset[run]
-  update <- repulsive_grid$update[run]
-  
-  filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
-  
-  all_M[run, ] <- readRDS(paste0("empirical/results_",dataset,"/M_a/M_a_", filename,".rds"))
-  
-}
-
-M_grid <- cbind(repulsive_grid, all_M)
-M.l <- M_grid %>% pivot_longer(cols = -c(1:ncol(repulsive_grid)), names_to = "iter", values_to = "M_a") %>% mutate(iter = as.numeric(iter))
+# all_M <- matrix(NA, nrow(repulsive_grid), n_save)
+# for(run in 1:nrow(repulsive_grid)){
+#   
+#   # Assign variable based on run-id
+#   zeta_samp <- repulsive_grid$zeta[run]
+#   gamma_samp <- repulsive_grid$gamma[run]
+#   dataset <- repulsive_grid$dataset[run]
+#   update <- repulsive_grid$update[run]
+#   
+#   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
+#   
+#   all_M[run, ] <- readRDS(paste0("empirical/results_",dataset,"/M_a/M_a_", filename,".rds"))
+#   
+# }
+# 
+# M_grid <- cbind(repulsive_grid, all_M)
+# M.l <- M_grid %>% pivot_longer(cols = -c(1:ncol(repulsive_grid)), names_to = "iter", values_to = "M_a") %>% mutate(iter = as.numeric(iter))
 
 
 
@@ -77,6 +77,8 @@ binder.ggs <- list()
 vi.ggs <- list()
 for(run in 1:nrow(repulsive_grid)){
   
+  print(run)
+  
   zeta_samp <- repulsive_grid$zeta[run]
   gamma_samp <- repulsive_grid$gamma[run]
   dataset <- repulsive_grid$dataset[run]
@@ -85,18 +87,18 @@ for(run in 1:nrow(repulsive_grid)){
   
   filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
   
-  post_pred <-  readRDS(paste0("empirical/results_",dataset,"/post_dens/post_dens_", filename,".rds"))
-  
-  df <- data.frame(x = y_grid1$Var1, y = y_grid1$Var2, density = post_pred)
-  
-  pps[[run]] <- ggplot(df, aes(x = x, y = y)) +
-    geom_tile(aes(fill = density)) +
-    geom_point(data = as.data.frame(y), aes(x = V1, y = V2 ), color = "black") +
-    geom_contour(aes(z = density, color = ..level..), bins = 10, size = 0.75) +
-    scale_fill_viridis_c()+
-    scale_color_viridis_c(option = "plasma") +
-    labs(title = paste0("Posterior predictive for zeta = ", zeta_samp, " and gamma = ", gamma_samp, " alpha = ", alpha_samp))
-  
+  # post_pred <-  readRDS(paste0("empirical/results_",dataset,"/post_dens/post_dens_", filename,".rds"))
+  # 
+  # df <- data.frame(x = y_grid1$Var1, y = y_grid1$Var2, density = post_pred)
+  # 
+  # pps[[run]] <- ggplot(df, aes(x = x, y = y)) +
+  #   geom_tile(aes(fill = density)) +
+  #   geom_point(data = as.data.frame(y), aes(x = V1, y = V2 ), color = "black") +
+  #   geom_contour(aes(z = density, color = ..level..), bins = 10, size = 0.75) +
+  #   scale_fill_viridis_c()+
+  #   scale_color_viridis_c(option = "plasma") +
+  #   labs(title = paste0("Posterior predictive for zeta = ", zeta_samp, " and gamma = ", gamma_samp, " alpha = ", alpha_samp))
+  # 
   ############################################################################################
   # Binder and VI
   ############################################################################################
@@ -104,25 +106,25 @@ for(run in 1:nrow(repulsive_grid)){
   
   # VI
   
-  s_vi <- c(salso(allocs_samp, loss=salso::VI(a=1)))
-  
-  
-  df <- data.frame(x = y[,1], y = y[,2], vi = s_vi) 
-  
-  vi.ggs[[run]] <- 
-    ggplot() +
-    geom_point(data = df, aes(x = x, y = y, color = factor(vi)),  size = 2) +
-    geom_encircle(data = df, aes(x = x, y = y, group = factor(vi), fill = factor(vi)),
-                  size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-    labs(title = paste0("VI for zeta = ", zeta_samp, " and gamma = ", gamma_samp, " alpha = ", alpha_samp), x = "", y = "") +
-    theme_minimal() +
-    theme(text=element_text(size=20), #change font size of all text
-          axis.text=element_text(size=30), #change font size of axis text
-          axis.title=element_text(size=20), #change font size of axis titles
-          plot.title=element_text(size=20), #change font size of plot title
-          legend.text=element_text(size=25), #change font size of legend text
-          legend.title=element_text(size=25),#change font size of legend title
-          legend.position = "none") 
+  # s_vi <- c(salso(allocs_samp, loss=salso::VI(a=1)))
+  # 
+  # 
+  # df <- data.frame(x = y[,1], y = y[,2], vi = s_vi) 
+  # 
+  # vi.ggs[[run]] <- 
+  #   ggplot() +
+  #   geom_point(data = df, aes(x = x, y = y, color = factor(vi)),  size = 2) +
+  #   geom_encircle(data = df, aes(x = x, y = y, group = factor(vi), fill = factor(vi)),
+  #                 size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
+  #   labs(title = paste0("VI for zeta = ", zeta_samp, " and gamma = ", gamma_samp, " alpha = ", alpha_samp), x = "", y = "") +
+  #   theme_minimal() +
+  #   theme(text=element_text(size=20), #change font size of all text
+  #         axis.text=element_text(size=30), #change font size of axis text
+  #         axis.title=element_text(size=20), #change font size of axis titles
+  #         plot.title=element_text(size=20), #change font size of plot title
+  #         legend.text=element_text(size=25), #change font size of legend text
+  #         legend.title=element_text(size=25),#change font size of legend title
+  #         legend.position = "none") 
   
   
   
@@ -130,13 +132,13 @@ for(run in 1:nrow(repulsive_grid)){
   # Save individual plots
   ##############################################################################
   
-  pdf(paste0("empirical/results_",dataset,"/dashboards/", "pps_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
-  print(pps[[run]])
-  dev.off()
-  
-  pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
-  print(vi.ggs[[run]])
-  dev.off()
+  # pdf(paste0("empirical/results_",dataset,"/dashboards/", "pps_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
+  # print(pps[[run]])
+  # dev.off()
+  # 
+  # pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
+  # print(vi.ggs[[run]])
+  # dev.off()
   
   ##############################################################################
   # End individual plots
@@ -156,20 +158,22 @@ for(run in 1:nrow(repulsive_grid)){
   #   theme_minimal() 
   
  binder.ggs[[run]] <- 
-    ggplot() +
-    geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
-    geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
-                  size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-    labs(title = paste0("Binder zeta = ", zeta_samp, " gamma = ", gamma_samp, " alpha = ", alpha_samp), x = "Food approach person parameter", y = "Food avoidance person parameter", legend = "test") +
-    theme_minimal() +
-    theme(text=element_text(size=10), #change font size of all text
-            axis.text=element_text(size=10), #change font size of axis text
-            axis.title=element_text(size=10), #change font size of axis titles
-            plot.title=element_text(size=10), #change font size of plot title
-            legend.text=element_text(size=5), #change font size of legend text
-            legend.title=element_text(size=5),#change font size of legend title
-    ) 
-          ##legend.position = "none") 
+   ggplot() +
+   geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
+   geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
+                 size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
+     scale_fill_npg() +
+     scale_color_npg() +
+   labs(title = paste0("Binder zeta = ", zeta_samp, " gamma = ", gamma_samp, " alpha = ", alpha_samp), x = "BMI", y = "Food approach person parameter", legend = "test") + #
+   theme_minimal() +
+   theme(text=element_text(size=10), #change font size of all text
+         axis.text=element_text(size=10), #change font size of axis text
+         axis.title=element_text(size=10), #change font size of axis titles
+         plot.title=element_text(size=10), #change font size of plot title
+         legend.text=element_text(size=5), #change font size of legend text
+         legend.title=element_text(size=5),#change font size of legend title
+   ) 
+ 
    
  pdf(paste0("empirical/results_",dataset,"/dashboards/", "binder_gamma_",gamma_samp,"_zeta_",zeta_samp,".pdf"), width = 12, height = 10)
   print(binder.ggs[[run]])
@@ -177,67 +181,70 @@ for(run in 1:nrow(repulsive_grid)){
   
   # M_bar
   
- M_bar_gfacet <- M.l %>% 
-   filter(dataset == !!dataset, alpha == 0.5) %>% 
-   mutate(zeta = as.factor(zeta), gamma = as.factor(gamma), iter = as.numeric(iter), alpha = as.factor(alpha)) %>% 
-   ggplot(aes(x =  M_a, fill =  zeta)) + 
-   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(width = 0.5, preserve = "single")) + 
-   scale_x_continuous( breaks = min(M.l$M_a):max(M.l$M_a)) +
-   facet_wrap(gamma~.) +
-   theme_bw() +
-   ggtitle(paste0("")) +
-   xlab("")+
-   ylab("") +
-   theme(text=element_text(size=20), #change font size of all text
-         axis.text=element_text(size=20), #change font size of axis text
-         axis.title=element_text(size=20), #change font size of axis titles
-         plot.title=element_text(size=20), #change font size of plot title
-         legend.text=element_text(size=25), #change font size of legend text
-         legend.title=element_text(size=25)) #change font size of legend title
- 
- M_bar_zfacet <- M.l %>% 
-   filter(dataset == !!dataset, alpha == 0.5) %>% 
-   mutate(zeta = as.factor(zeta), gamma = as.factor(gamma), iter = as.numeric(iter), alpha = as.factor(alpha)) %>% 
-   ggplot(aes(x =  M_a, fill =  gamma)) + 
-   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(width = 0.5, preserve = "single")) + 
-   scale_x_continuous( breaks = min(M.l$M_a):max(M.l$M_a)) +
-   facet_wrap(zeta~.) +
-   theme_bw() +
-   ggtitle(paste0("")) +
-   xlab("")+
-   ylab("") +
-   theme(text=element_text(size=20), #change font size of all text
-         axis.text=element_text(size=20), #change font size of axis text
-         axis.title=element_text(size=20), #change font size of axis titles
-         plot.title=element_text(size=20), #change font size of plot title
-         legend.text=element_text(size=25), #change font size of legend text
-         legend.title=element_text(size=25)) #change font size of legend title
+ # M_bar_gfacet <- M.l %>% 
+ #   filter(dataset == !!dataset, alpha == 0.5) %>% 
+ #   mutate(zeta = as.factor(zeta), gamma = as.factor(gamma), iter = as.numeric(iter), alpha = as.factor(alpha)) %>% 
+ #   ggplot(aes(x =  M_a, fill =  zeta)) + 
+ #   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(width = 0.5, preserve = "single")) + 
+ #   scale_x_continuous( breaks = min(M.l$M_a):max(M.l$M_a)) +
+ #   facet_wrap(gamma~.) +
+ #   theme_bw() +
+ #   ggtitle(paste0("")) +
+ #   xlab("")+
+ #   ylab("") +
+ #   theme(text=element_text(size=20), #change font size of all text
+ #         axis.text=element_text(size=20), #change font size of axis text
+ #         axis.title=element_text(size=20), #change font size of axis titles
+ #         plot.title=element_text(size=20), #change font size of plot title
+ #         legend.text=element_text(size=25), #change font size of legend text
+ #         legend.title=element_text(size=25)) #change font size of legend title
+ # 
+ # M_bar_zfacet <- M.l %>% 
+ #   filter(dataset == !!dataset, alpha == 0.5) %>% 
+ #   mutate(zeta = as.factor(zeta), gamma = as.factor(gamma), iter = as.numeric(iter), alpha = as.factor(alpha)) %>% 
+ #   ggplot(aes(x =  M_a, fill =  gamma)) + 
+ #   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(width = 0.5, preserve = "single")) + 
+ #   scale_x_continuous( breaks = min(M.l$M_a):max(M.l$M_a)) +
+ #   facet_wrap(zeta~.) +
+ #   theme_bw() +
+ #   ggtitle(paste0("")) +
+ #   xlab("")+
+ #   ylab("") +
+ #   theme(text=element_text(size=20), #change font size of all text
+ #         axis.text=element_text(size=20), #change font size of axis text
+ #         axis.title=element_text(size=20), #change font size of axis titles
+ #         plot.title=element_text(size=20), #change font size of plot title
+ #         legend.text=element_text(size=25), #change font size of legend text
+ #         legend.title=element_text(size=25)) #change font size of legend title
  
 }
 
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_gfacet.pdf"), width = 12, height = 10)
-print(M_bar_gfacet)
-dev.off()
-
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_zfacet.pdf"), width = 12, height = 10)
-print(M_bar_zfacet)
-dev.off()
+# pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_gfacet.pdf"), width = 12, height = 10)
+# print(M_bar_gfacet)
+# dev.off()
+# 
+# pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_zfacet.pdf"), width = 12, height = 10)
+# print(M_bar_zfacet)
+# dev.off()
+# 
 
 pdf(paste0("empirical/results_",dataset,"/dashboards/", "binder.pdf"), width = 12, height = 10)
 
-for(start_index in seq(1, length(pps), by = 6)){
+for(start_index in seq(1, nrow(repulsive_grid), by = 6)){
   do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 5)]), ncol=3))
 }
 
 dev.off()
 
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi.pdf"), width = 12, height = 10)
 
-for(start_index in seq(1, length(pps), by = 6)){
-  do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 5)]), ncol=3))
-}
 
-dev.off()
+# pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi.pdf"), width = 12, height = 10)
+# 
+# for(start_index in seq(1, length(pps), by = 6)){
+#   do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 5)]), ncol=3))
+# }
+# 
+# dev.off()
 
 
 # too many clusters
@@ -249,115 +256,13 @@ dev.off()
 library(patchwork)
 pdf(paste0("empirical/results_",dataset,"/dashboards/", "test.pdf"), width = 12, height = 6)
 
+#print(binder.ggs[[85]] + binder.ggs[[89]] + binder.ggs[[101]])
+
 print(binder.ggs[[85]] + binder.ggs[[89]] + binder.ggs[[101]])
 
 dev.off()
 
 
-
-
-
-
-
-
-
-
-# AntMAN
-
-pp_am <-  readRDS(paste0("empirical/results_",dataset,"/antman/post_dens.rds"))
-
-df <- data.frame(x = y_grid$Var1, y = y_grid$Var2, density = pp_am)
-
-pp_am <- 
-  ggplot(df, aes(x = x, y = y)) +
-  geom_tile(aes(fill = density)) +
-  geom_point(data = as.data.frame(y1), aes(x = V1 , y = V2 ), color = "black") +
-  geom_contour(aes(z = density, color = ..level..), bins = 10, size = 0.75) +
-  scale_fill_viridis_c()+
-  scale_color_viridis_c(option = "plasma") +
-  labs(title = paste0("Posterior predictive for AntMAN"))
-
-allocs <- readRDS(paste0("empirical/results_",dataset,"/antman/allocs.rds"))
-s_vi <- c(salso(allocs, loss=salso::VI(a=1)))
-df <- data.frame(x = y1[,1], y = y1[,2], color = s_vi)
-
-vi_am <- 
-  ggplot() +
-  geom_point(data = df, aes(x = x, y = y, color = factor(color)),  size = 2) +
-  geom_encircle(data = df, aes(x = x, y = y, group = color, fill = factor(color)),
-                size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-  labs(title = "VI estimate for AntMAN", x = "X-axis", y = "Y-axis") +
-  theme_minimal() 
-
-s_binder <-  c(salso(allocs, loss=salso::binder(a=1)))
-df <- data.frame(x = y1[,1], y = y1[,2], color = s_binder)
-
-binder_am <- 
-  ggplot() +
-  geom_point(data = df, aes(x = x, y = y, color = factor(color)),  size = 2) +
-  geom_encircle(data = df, aes(x = x, y = y, group = color, fill = factor(color)),
-                size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
-  labs(title = "Binder estimate for AntMAN", x = "X-axis", y = "Y-axis") +
-  theme_minimal() 
-
-M_a_antman <- readRDS(paste0("empirical/results_",dataset,"/antman/M_a.rds"))
-M_antman.l <- data.frame(zeta = "AntMAN", gamma = 1e-6, dataset = factor(dataset), update = factor("fixed"), alpha = 0.5, iter = 1:n_save, M_a = M_a_antman)
-M.l <- rbind(M.l, M_antman.l)
-
-M_bar <- M.l %>% 
-  filter(dataset == !!dataset, alpha == 0.5) %>% 
-  mutate(zeta = as.factor(zeta), gamma = as.factor(gamma), iter = as.numeric(iter), alpha = as.factor(alpha)) %>% 
-  ggplot(aes(x =  M_a, fill =  zeta)) + 
-  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(width = 0.5, preserve = "single")) + 
-  scale_x_continuous( breaks = min(M.l$M_a):max(M.l$M_a)) +
-  theme_bw() +
-  ggtitle(paste0("")) +
-  xlab("")+
-  ylab("") +
-  theme(text=element_text(size=20), #change font size of all text
-        axis.text=element_text(size=20), #change font size of axis text
-        axis.title=element_text(size=20), #change font size of axis titles
-        plot.title=element_text(size=20), #change font size of plot title
-        legend.text=element_text(size=25), #change font size of legend text
-        legend.title=element_text(size=25)) #change font size of legend title
-
-
-
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "pps.pdf"), width = 12, height = 10)
-
-for(start_index in seq(1, length(pps), by = 6)){
-  #do.call(grid.arrange, c(c(pps[start_index:(start_index + 4)], list(pp_am)), ncol=3))
-  do.call(grid.arrange, c(c(pps[start_index:(start_index + 5)]), ncol=3))
-}
-
-dev.off()
-
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_gfacet.pdf"), width = 12, height = 10)
-  print(M_bar_gfacet)
-dev.off()
-
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "M_bar_zfacet.pdf"), width = 12, height = 10)
-  print(M_bar_zfacet)
-dev.off()
-
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "binder.pdf"), width = 12, height = 10)
-
-for(start_index in seq(1, length(pps), by = 6)){
-  #do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 4)], list(binder_am)), ncol=3))
-  do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 5)]), ncol=3))
-}
-
-dev.off()
-
-
-pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi.pdf"), width = 12, height = 10)
-
-for(start_index in seq(1, length(pps), by = 6)){
-  #do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 4)], list(vi_am)), ncol=3))
-  do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 5)]), ncol=3))
-}
-
-dev.off()
 
 
 

@@ -646,7 +646,7 @@ repulsive_grid_fixed <- data.frame(repulsive_grid) %>% filter(!(gamma %in% c(0.5
 
 gg_psms <- list()
 for(run in 1:nrow(repulsive_grid_fixed)){
-
+  print(run)
   #filename <- paste0( paste0(colnames(repulsive_grid[run,]), "_"), paste0(repulsive_grid[run,]), collapse = "_" )
   filename <- paste0( paste0(colnames(repulsive_grid_fixed[run,]), "_"), paste0(repulsive_grid_fixed[run,]), collapse = "_" )
   allocs <- readRDS(paste0("simstudy/results/",dataset,"/allocs/allocs_",filename,".rds"))
@@ -696,7 +696,7 @@ for(run in 1:nrow(repulsive_grid_fixed)){
          y = "",
          fill = "") +
     theme_minimal() +
-    theme(legend.position = "none") +
+    #theme(legend.position = "none") +
     theme(axis.text.x = element_blank(),
           axis.text.y = element_blank(),
           panel.border = element_rect(colour = "black", fill = NA, linewidth = 1))+
@@ -719,10 +719,45 @@ grid_plot <-
   plot_layout(guides = "collect") &
   theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
 
-grid_plot
+#only 1 legend per row
+
+# Remove legend for each but the last in every row of 4
+gg_psms_1_leg <- lapply(seq_along(gg_psms), function(i) {
+  if (i %% 4 != 0) {
+    gg_psms[[i]] + theme(legend.position = "none")
+  } else {
+    gg_psms[[i]]
+  }
+})
+
+grid_plot_1_leg <-
+((gg_psms_1_leg[[1]] | gg_psms_1_leg[[2]] | gg_psms_1_leg[[3]] | gg_psms_1_leg[[4]]) &
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm")))/
+  ((gg_psms_1_leg[[5]] | gg_psms_1_leg[[6]] | gg_psms_1_leg[[7]] | gg_psms_1_leg[[8]]) &
+     theme(plot.margin = unit(c(0, 0, 0, 0), "cm")))/
+  ((gg_psms_1_leg[[9]] | gg_psms_1_leg[[10]] | gg_psms_1_leg[[11]] | gg_psms_1_leg[[12]]) &
+     theme(plot.margin = unit(c(0, 0, 0, 0), "cm")))/
+  ((gg_psms_1_leg[[13]] | gg_psms_1_leg[[14]] | gg_psms_1_leg[[15]] | gg_psms_1_leg[[16]]) &
+     theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))) +
+  #plot_layout(guides = "collect") &
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+
+grid_plot_1_leg
 
 #pdf(paste0("simstudy/results/",dataset,"/plots/true_similarity_matrix.pdf"), width = 10, height = 10)
-png( paste0("simstudy/results/",dataset,"/plots/psm_fixed_npg_2025.png"),
+png( paste0("simstudy/results/",dataset,"/plots/psm_fixed_npg_2025_1_legend.png"),
+     width     = 5,
+     height    = 5,
+     units     = "in",
+     res       = 100,
+     pointsize = 4)
+
+# Display the 4x4 grid of plots
+print(grid_plot_1_leg)
+
+dev.off()
+
+png( paste0("simstudy/results/",dataset,"/plots/psm_fixed_npg_2025_all_legends.png"),
      width     = 5,
      height    = 5,
      units     = "in",
@@ -733,6 +768,9 @@ png( paste0("simstudy/results/",dataset,"/plots/psm_fixed_npg_2025.png"),
 print(grid_plot)
 
 dev.off()
+
+
+
 
 # ((gg_psms[[1]] | gg_psms[[2]] | gg_psms[[3]] | gg_psms[[4]]) &
 #     theme(plot.margin = unit(c(0, 0, 0, 0), "cm")))/
@@ -778,7 +816,7 @@ table(all_M_a.w$zeta)
 
 pdf(paste0("simstudy/results/",dataset,"/plots/M_a_bar_fixed_2025.pdf"), width = 10, height = 10)
 
-gg_M_a_bar_fixed <-
+#gg_M_a_bar_fixed <-
 all_M_a.w %>%
   filter(!(gamma %in% c(0.5,99:101)) & !(zeta %in% c(98))) %>% arrange(gamma, zeta) %>%
   #filter(!(gamma %in% c(0.5,99:101)) & !(zeta %in% c(1, 3, 98))) %>%
@@ -790,9 +828,10 @@ all_M_a.w %>%
   mutate(zeta = ifelse(zeta == 99, "G(0.1,1)", zeta)) %>%
   ggplot(aes(x = M_a, fill = factor(gamma)))+
   geom_bar(aes(y = after_stat(prop)),position = "dodge2") +
-  facet_grid(gamma ~zeta, scales = "fixed") +
+  facet_grid(gamma ~zeta, scales = "free_y",) + #  , switch = "both"
+  #facet_wrap(gamma ~zeta, scales = "free_x") + #free_x
   labs(title = "",
-       x = "",
+       #x = "",
        y = "",
        fill = expression(gamma)) +
   theme_minimal() +
@@ -802,13 +841,14 @@ all_M_a.w %>%
     text=element_text(size=20), #change font size of all text
         #strip.background = element_blank(),
         #strip.text.x = element_blank(),
+        #axis.line=element_line(),
         axis.text=element_text(size=15), #change font size of axis text
         axis.title=element_text(size=15), #change font size of axis titles
         plot.title=element_text(size=15), #change font size of plot title
         legend.text=element_text(size=15), #change font size of legend text
         legend.title=element_text(size=15)) +
-  scale_x_continuous(breaks = scales::breaks_pretty(n = 10))
-  #scale_x_continuous(breaks = seq(floor(min(all_M_a.w$M_a)), ceiling(max(all_M_a.w$M_a)), by = 1))
+  #scale_x_continuous(breaks = scales::breaks_pretty(n = 5))
+  scale_x_continuous(breaks = seq(floor(min(all_M_a.w$M_a)), ceiling(max(all_M_a.w$M_a)), by = 1))
 
 print(gg_M_a_bar_fixed)
 
@@ -1152,19 +1192,39 @@ for(run in 1:nrow(repulsive_grid_prior)){
   # good: "#f0f0f0"
 
   # Plot the clustered heatmap
+  #Old:  
+  # gg_psms[[run]] <- ggplot(similarity_df, aes(x = Observation1, y = Observation2, fill = Similarity)) +
+  #   geom_tile() +
+  #   scale_fill_gradient(low = "#f4f3ff", high = pal_npg()(4)[run]) +
+  #   #scale_fill_gradient(low = "white", high = "darkred") +
+  #   labs(title = "",
+  #        x = "",
+  #        y = "",
+  #        fill = "") +
+  #   theme_minimal() +
+  #   theme(legend.position = "none") +
+  #   theme(axis.text.x = element_blank(),
+  #         axis.text.y = element_blank(),
+  #         panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
+  #   )
+  
   gg_psms[[run]] <- ggplot(similarity_df, aes(x = Observation1, y = Observation2, fill = Similarity)) +
     geom_tile() +
-    scale_fill_gradient(low = "#f4f3ff", high = pal_npg()(4)[run]) +
+    scale_fill_gradient(low = "#f4f3ff", high = pal_npg()(4)[run], limits = c(0, 1)) +
     #scale_fill_gradient(low = "white", high = "darkred") +
     labs(title = "",
          x = "",
          y = "",
          fill = "") +
     theme_minimal() +
-    theme(legend.position = "none") +
+    #theme(legend.position = "none") +
     theme(axis.text.x = element_blank(),
           axis.text.y = element_blank(),
-          panel.border = element_rect(colour = "black", fill = NA, linewidth = 1))
+          panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+          legend.text = element_text(size = 15),  # Adjust legend text size
+          #legend.title = element_text(size = 20), # Adjust legend title size
+          legend.key.size = unit(1, "cm")       # Adjust legend key size
+    )
 
 }
 
@@ -1172,10 +1232,16 @@ gg_psm_nps <- gg_psms[[1]] / gg_psms[[2]] / gg_psms[[3]] / gg_psms[[4]]
 
 # Ncol 1 combined now with psm
 
+all_repara.l <- all_repara.l %>% 
+  mutate(zeta = ifelse(zeta == 98, 100, zeta))
+
+all_M_a.w<- all_M_a.w %>% 
+  mutate(zeta = ifelse(zeta == 98, 100, zeta))
+
 # Example ggplot objects
-p1 <- create_paper_plots(all_repara.l, "line", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 98))
-p2 <-  create_paper_plots(all_repara.l, "density", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 98))
-p3 <- create_paper_plots(all_M_a.w, "barplot", 1 ,legend = TRUE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 98)) +
+p1 <- create_paper_plots(all_repara.l, "line", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 100))
+p2 <-  create_paper_plots(all_repara.l, "density", 1,legend = FALSE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 100))
+p3 <- create_paper_plots(all_M_a.w, "barplot", 1 ,legend = TRUE, gamma_include = c(100), zeta_include = c(0.001, 1, 5, 100)) + #98
   theme(
   legend.text = element_text(size = 20),  # Adjust legend text size
   legend.title = element_text(size = 20), # Adjust legend title size
@@ -1198,5 +1264,21 @@ png( paste0(path,"M_bar_repara_line_dens_psm_legendside_2025.png"),
 
 p1 + p2 + gg_psm_nps +  p3 +
   plot_layout(guides = "collect", ncol = 4, widths = c(2, 1, 1, 2))
+
+dev.off()
+
+png( paste0(path,"M_bar_repara_line_dens_psm_legendside_2025_psm_legends.png"),
+     width     = 32,
+     height    = 16,
+     units     = "in",
+     res       = 100,
+     pointsize = 4)
+
+# Combine plots with a shared legend
+
+#(p1 + theme(legend.position = "none"))  | (p2 + theme(legend.position = "none"))| (gg_psm_nps + theme(legend.position = "none")) | (p3 + plot_layout(guides = "collect"))
+
+p1 + p2 + gg_psm_nps +  p3 +
+  plot_layout(ncol = 4, widths = c(2, 1, 1, 2))
 
 dev.off()

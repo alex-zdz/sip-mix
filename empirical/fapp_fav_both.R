@@ -15,6 +15,7 @@ all_datasets <- c("bmi_pp_fa")
 
 all_updates <- c("fixed")
 all_alphas <- c( 1, 3, 5) # 0. already run
+all_alphas <- c(5) # 0. already run
 repulsive_grid <- expand.grid(all_gammas, all_zetas, all_datasets, all_updates, all_alphas)
 colnames(repulsive_grid) <- c("gamma", "zeta", "dataset", "update", "alpha")
 
@@ -205,7 +206,7 @@ cl <- parallel::makeCluster(parallel::detectCores())
 op <- pboptions(type="timer")
 
 # Quick run for testing
-system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
+#system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
 
 n_save = 5e3;  n_burn = 10e3; n_thin = 2
 system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
