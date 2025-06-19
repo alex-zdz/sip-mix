@@ -483,3 +483,30 @@ png( paste0(path,"M_bar_repara_line_dens_psm_legendside_2.png"),
 
 dev.off()
 
+
+##################################
+# Internal dispersion
+##################################
+
+exp_intern_dispersion <- function(alpha, gamma, tau, M){
+  
+  beta <- alpha
+  num <- exp(log_D(M, alpha, beta, gamma + tau / 2))
+  demon <- exp(log_D(M, alpha, beta, gamma))
+  return(num / demon)  
+    
+}
+
+exp_intern_dispersion(alpha = 0.1, gamma = 1, tau = 1, M = 4)
+
+v_exp_intern_dispersion <- Vectorize(exp_intern_dispersion, "tau")
+
+taus <- seq(0, 3, by = 0.1)
+
+plot(taus, v_exp_intern_dispersion(alpha = 1, gamma = 1, tau = taus, M = 3))
+
+
+
+
+
+

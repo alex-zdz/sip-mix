@@ -1,247 +1,173 @@
-#setwd("C:/Users/alexm/NUS Dropbox/Alexander Mozdzen/MARIA-REPULSIVEWEIGHTS/2025/sip-mix/empirical")
+# 01.04.2025 script to create all dashboards and plots for the results from the run with the food-avoidance and food-approach dataset
 
-# Load packages
-library(rdist)
-library(brms)
+#setwd("~/paper/2d/eating_behavior_scripts")
+
+#Load libraries
+library(gridExtra)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+library(ggalt)
 library(salso)
-
-
+# replicate repulsive grid used to run the analysis in "fapp_fav_both.R"
 # Create grid
-all_gammas <- c(0, 0.1, 0.5, 1, 2, 5)
-all_zetas <- c(0.001, 0.1, 0.5, 1, 2, 3 )
-
 all_gammas <- c(0, 0.5, 1, 2)
 all_zetas <- c(0.001, 0.1, 0.5, 1, 2)
-
-#all_zetas <- c(0.001, 0.1, 0.5, 1, 2, 3, 5)
 all_datasets <- c("m_bmi_ch_bmi_w07", "m_bmi_ch_bmi_w10", "m_bmi_ch_bmi_w12", "m_bmi_ch_bmi_w14")
-
 all_updates <- c("fixed")
-all_alphas <- c( 1, 5) # 0. already run
+all_alphas <- c(1, 5)
 repulsive_grid <- expand.grid(all_gammas, all_zetas, all_datasets, all_updates, all_alphas)
 colnames(repulsive_grid) <- c("gamma", "zeta", "dataset", "update", "alpha")
 
-dir.create(paste0("grid/"), showWarnings = FALSE, recursive = TRUE)
-saveRDS(repulsive_grid, paste0("grid/","mother_child_bmi_grid.rds"))
 
-n_save = 100;n_burn = 100;n_thin = 1
+# Plots
 
 
-grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
+# all_nrows <- rep(NA, nrow(repulsive_grid))
+for(run in 1:nrow(repulsive_grid)){
+
+  # zeta_samp <- repulsive_grid$zeta[run]
+  # gamma_samp <- repulsive_grid$gamma[run]
+  # dataset <- repulsive_grid$dataset[run]
+  # update <- repulsive_grid$update[run]
+  # alpha_samp <- repulsive_grid$alpha[run]
+  # 
+  # #dir.create(paste0("empirical/results_",dataset,"/dashboards/"), showWarnings = FALSE, recursive = TRUE)
+  # 
+  # # 
+  # # filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
+  # # 
+  # # allocs_samp = readRDS(paste0("empirical/results_",dataset,"/allocs/allocs_", filename,".rds"))
+  # # 
+  # # all_nrows[run] <- dim(allocs_samp)[1]
+}
+
+binder.ggs <- list()
+vi.ggs <- list()
+
+# new grid to iterate over datasets last:
+
+repulsive_grid2 <- expand.grid(all_gammas, all_zetas, all_updates, all_alphas, all_datasets)
+colnames(repulsive_grid2) <- c("gamma", "zeta",  "update", "alpha","dataset")
+
+for(run in 1:nrow(repulsive_grid2)){
   
-  tryCatch({
-
-    library(rdist)
-    library(brms)
-    library(MASS)
-    library(mclust)
-    library(combinat)
-    library(plyr)
-    library(reshape2)
-    #library(beepr)
-    library(AntMAN)
-    library(salso)
-    library(mvtnorm)
-    library(MCMCpack)
-    # Source functions:
-    source("src/rep_mix_main_new.R")
-    source("src/log_sdir.R")
-    Rcpp::sourceCpp("src/rcpp_functions.cpp")
-    
-    # # Assign variable based on run-id
-    zetas_samp <- rep(repulsive_grid$zeta[run], 2)
-    gamma_samp <- repulsive_grid$gamma[run]
-    dataset <- repulsive_grid$dataset[run]
-    update <- repulsive_grid$update[run]
-    alpha_prior <- repulsive_grid$alpha[run]
-    
-    filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
-    
-    y <- as.matrix(readRDS(paste0("empirical/data/", dataset, ".rds")))
-    # Set C for C for now
-    C = 3
-    D = 2
-    N <- nrow(y)
-    # Define hyperparameters and starting values:
-    
-    rep_prior_shape <- 0.1
-    rep_prior_rate <- 1
-    M_prior <- C - 1
-    p_b <- 0.5
-    alpha_prior <- alpha_prior
-    beta_prior = alpha_prior
-    sigma2_prior_shape <- 3
-    sigma2_prior_rate <- 2
-    
-    # hyperparameters <- list(mu_prop_means =mu_prop_means,
-    #                         mu_prop_Sigma = mu_prop_Sigma,
-    #                         Sigma_prior_mat = diag(D),
-    #                         Sigma_prior_df = 2,
-    #                         alpha_prior = alpha_prior, beta_prior = beta_prior,
-    #                         rep_prior_shape = rep_prior_shape, rep_prior_rate = rep_prior_rate,
-    #                         M_prior = M_prior,
-    #                         p_b = p_b,
-    #                         g_to_z_ratio = 1,
-    #                         g_time_z_ratio = 1)
-    
-    hyperparameters <- list(
-      mu_prior_mean = 0, #mean(y),
-      mu_prior_var_scale = 1e-05,
-      #mu_prior_var_scale = 1,
-      mu_prior_var = 100000,
-      mu_prop_means = if(D == 1){ mean(y)} else{colMeans(y)},
-      mu_prop_Sigma = if(D == 1) 1 else diag(rep(1, D)),
-      Sigma_prior_mat = diag(D),
-      Sigma_prior_df = 2,
-      sigma2_prior_shape = sigma2_prior_shape,
-      sigma2_prior_rate = sigma2_prior_rate,
-      alpha_prior = alpha_prior,
-      beta_prior = alpha_prior,
-      M_prior = M_prior,
-      p_b = 0.5,
-      rep_prior_shape = rep_prior_shape,
-      rep_prior_rate = rep_prior_rate,
-      g_to_z_ratio = 1,
-      g_time_z_ratio = 1,
-      repulsive_locations = TRUE,
-      mu_independent = FALSE,
-      weights_prior = "selberg"
-    )
-    
-    list2env(hyperparameters, envir = .GlobalEnv)
-    
-    # Define updates
-    updates <- list(
-      update_allocs = TRUE, update_gamma = FALSE, update_zetas = FALSE, g_to_z = FALSE, g_time_z = FALSE,
-      update_var = TRUE, update_mu = TRUE, update_weight = TRUE,
-      update_M = TRUE, update_post_dens = TRUE
-    )
-    
-    list2env(updates, envir = .GlobalEnv)
-    
-    # Predefine M before
-    if(update_M){
-      M_a_samp = max(2, rpois(1, M_prior))
-      M_na_samp = max(2, rpois(1, M_prior))
-    }else{
-      M_a_samp = C
-      M_na_samp = 0
-    }
-    
-    M_samp = M_a_samp + M_na_samp
-    allocs_samp = rep(c(1:M_a_samp), length.out = N)
-    mus_a_samp = t(rmvnorm(M_a_samp, mu_prop_means, mu_prop_Sigma ))
-    mus_na_samp = t(rmvnorm(M_na_samp, mu_prop_means, mu_prop_Sigma ))
-    mus_samp <- cbind(mus_a_samp, mus_na_samp)
-    Sigmas_a_samp = array(diag(D), dim = c(D, D, M_a_samp))
-    Sigmas_na_samp = array(diag(D), dim = c(D, D, M_na_samp))
-    weights_samp = c(brms::rdirichlet(1, rep(alpha_prior, M_samp)))
-    tuning_sd_mu = 1
-    tuning_sd_gamma = 0.1
-    tuning_sd_zeta = 0.1
-    
-    starting_values <- list(
-      M_a_samp = M_a_samp,
-      M_na_samp = M_na_samp,
-      M_samp = M_samp,
-      allocs_samp = allocs_samp,
-      mus_a_samp = mus_a_samp,
-      mus_na_samp = mus_na_samp,
-      mus_samp = mus_samp,
-      Sigmas_a_samp = Sigmas_a_samp,
-      Sigmas_na_samp = Sigmas_na_samp,
-      weights_samp = weights_samp,
-      gamma_samp = gamma_samp,
-      zetas_samp = zetas_samp,
-      tuning_sd_mu = tuning_sd_mu,
-      tuning_sd_gamma = tuning_sd_gamma,
-      tuning_sd_zeta = tuning_sd_zeta
-    )
-    
-    
-    
-    #########################################################################
-    set.seed(1)
-    
-    # startt <- Sys.time()
-    
-    # results <- rep_mix_main(y, updates = updates, hyperparameters = hyperparameters , starting_values = starting_values,
-    #                                   n_save = n_save, n_burn = n_burn, n_thin = n_thin)
-    
-    # endt <-  Sys.time() - startt 
-    # endt
-    #alex
-    
-    startt <- Sys.time()
-    
-    results <- rep_mix_main(y, updates = updates, hyperparameters = hyperparameters , starting_values = starting_values,
-                            n_save = n_save, n_burn = n_burn, n_thin = n_thin)
-    
-    endt <-  Sys.time() - startt 
-    endt
-    
-    
-    
-    # Clustering:
-    
-    dir.create(paste0("empirical/results_",dataset,"/allocs/"), showWarnings = FALSE, recursive = TRUE)
-    saveRDS(results$alloc_out, paste0("empirical/results_",dataset,"/allocs/","allocs_",filename,".rds"))
-    
-    s_out <- results$alloc_out
-    a_cost <- 1
-    
-    # binder estimate using the salso package
-    
-    s_binder <- c(salso(results$alloc_out, loss=salso::binder(a = 1)))
-    J_binder <- max(s_binder)
-    nj_binder <- table(s_binder)
-    
-    dir.create(paste0("empirical/results_",dataset,"/s_binder/"), showWarnings = FALSE, recursive = TRUE)
-    saveRDS(s_binder, paste0("empirical/results_",dataset,"/s_binder/","s_binder_",filename,".rds"))
-    
-    dir.create(paste0("empirical/results_",dataset,"/post_dens/"), showWarnings = FALSE, recursive = TRUE)
-    saveRDS(colMeans(results$post_dens_out), paste0("empirical/results_",dataset,"/post_dens/","post_dens_",filename,".rds"))
-    
-    dir.create(paste0("empirical/results_",dataset,"/M_a/"), showWarnings = FALSE, recursive = TRUE)
-    saveRDS(results$M_a_out, paste0("empirical/results_",dataset,"/M_a/","M_a_",filename,".rds"))
+  print(run)
   
-   }, error = function(e) {
-    message("Error at run = ", run, ": ", conditionMessage(e))
-     list(result = NULL, error = conditionMessage(e), runtime = NA, run = run)
-  })
+  zeta_samp <- repulsive_grid2$zeta[run]
+  gamma_samp <- repulsive_grid2$gamma[run]
+  dataset <- repulsive_grid2$dataset[run]
+  update <- repulsive_grid2$update[run]
+  alpha_samp <- repulsive_grid2$alpha[run]
+  
+  dir.create(paste0("empirical/results_",dataset,"/dashboards/"), showWarnings = FALSE, recursive = TRUE)
+  
+  y <- readRDS(paste0("empirical/data/",dataset,".rds"))
+  #colnames(y) <- c("x", "y")
+  
+  filename <- paste0( paste0(colnames(repulsive_grid2[run,-5]), "_"), paste0(repulsive_grid2[run,-5]), collapse = "_" )
+  
+  ############################################################################################
+  # Binder and VI
+  ############################################################################################
+  allocs_samp = readRDS(paste0("empirical/results_",dataset,"/allocs/allocs_", filename,".rds")) 
+  
+  
+  
+  # VI
+  
+  s_vi <- c(salso(allocs_samp, loss=salso::VI(a=1)))
+  
+  
+  df <- data.frame(x = y[,1], y = y[,2], Cluster = as.factor(s_vi)) 
+  
+  vi.ggs[[run]] <- 
+    ggplot(df, aes_string(x = names(df)[1], y = names(df)[2])) +
+    geom_point(aes(color = Cluster), size = 2) +
+    geom_encircle(data = df, aes(x = x, y = y, group = factor(vi), fill = factor(vi)),
+                  size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
+    labs(title = paste0("VI for dataset = ", dataset, " zeta = ", zeta_samp, " gamma = ", gamma_samp, " alpha = ", alpha_samp), x = "", y = "") +
+    theme_minimal() +
+    theme(text=element_text(size=20), #change font size of all text
+          axis.text=element_text(size=30), #change font size of axis text
+          axis.title=element_text(size=20), #change font size of axis titles
+          plot.title=element_text(size=20), #change font size of plot title
+          legend.text=element_text(size=25), #change font size of legend text
+          legend.title=element_text(size=25),#change font size of legend title
+          legend.position = "none") 
+  
+  # Binder
+  s_binder <-  c(salso(allocs_samp, loss=salso::binder(a=1)))
+  
+  df <- data.frame(x = y[,1], y = y[,2], Cluster = as.factor(s_binder))
+  
+  ggplot(df, aes_string(x = names(df)[1], y = names(df)[2])) +
+    geom_point(aes(color = Cluster), size = 2)
+  
+  binder.ggs[[run]] <- 
+    ggplot(df, aes_string(x = names(df)[1], y = names(df)[2])) +
+    geom_point(aes(color = Cluster), size = 2) +
+    geom_encircle(aes(group = Cluster, fill = Cluster),
+                  size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5, spread=0.025) +
+    labs(title = paste0("Binder for dataset = ", dataset, "\n"," zeta = ", zeta_samp, " gamma = ", gamma_samp, " alpha = ", alpha_samp)) +
+    theme_minimal() +
+    theme(text=element_text(size=10), #change font size of all text
+          axis.text=element_text(size=10), #change font size of axis text
+          axis.title=element_text(size=10), #change font size of axis titles
+          plot.title=element_text(size=10), #change font size of plot title
+          legend.text=element_text(size=5), #change font size of legend text
+          legend.title=element_text(size=5) #change font size of legend title
+    ) 
   
 }
 
-library(pbapply)
-library(parallel)
-parallel::detectCores()
-cl <- parallel::makeCluster(parallel::detectCores())
 
-op <- pboptions(type="timer")
+# for(dataset in all_datasets){
 
-# Quick run for testing
-#results <- system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
+# pdf(paste0("empirical/results_",dataset,"/dashboards/", "binder.pdf"), width = 12, height = 10)
 
-#results <- pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl)
-#results
-
-# safe_grid_eval_debug <- function(i, repulsive_grid, n_save, n_burn, n_thin) {
-#   message("Running i = ", i)
-#   tryCatch({
-#     safe_grid_eval(i, repulsive_grid, n_save, n_burn, n_thin)
-#   }, error = function(e) {
-#     message("Error at i = ", i, ": ", conditionMessage(e))
-#     return(NULL)
-#   })
+# for(start_index in seq(1, length(pps), by = 6)){
+#   do.call(grid.arrange, c(c(binder.ggs[start_index:(start_index + 5)]), ncol=3))
 # }
-#system.time(pblapply(1:nrow(repulsive_grid), safe_grid_eval_debug, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
+
+# dev.off()
+
+# pdf(paste0("empirical/results_",dataset,"/dashboards/", "vi.pdf"), width = 12, height = 10)
+
+# for(start_index in seq(1, length(pps), by = 6)){
+#   do.call(grid.arrange, c(c(vi.ggs[start_index:(start_index + 5)]), ncol=3))
+# }
+
+# dev.off()
+
+# }
+
+# Calculate the number of plots per dataset
+plots_per_dataset <- nrow(repulsive_grid) / length(all_datasets)
+
+for(dataset_index in seq_along(all_datasets)){
+  dataset <- all_datasets[dataset_index]
+  print(dataset)
+  # Calculate the start and end indices for the current dataset's plots
+  start_index <- (dataset_index - 1) * plots_per_dataset + 1
+  end_index <- dataset_index * plots_per_dataset
+  
+  # Create a PDF for each dataset
+  pdf(paste0("empirical/results_", dataset, "/dashboards/", "binder_", dataset, ".pdf"), width = 12, height = 10)
+  
+  # Plot the binder.ggs for the current dataset
+  for(plot_index in seq(start_index, end_index, by = 6)){
+    do.call(grid.arrange, c(c(binder.ggs[plot_index:min(plot_index + 5, end_index)]), ncol=3))
+  }
+  
+  dev.off()
+}
 
 
-n_save = 5e3;  n_burn = 10e3; n_thin = 2
-#results <- system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
-results <- pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl)
+# pdf(paste0("empirical/results_",dataset,"/dashboards/", "test.pdf"), width = 12, height = 6)
 
+# print(binder.ggs[[85]] + binder.ggs[[89]] + binder.ggs[[101]])
 
-parallel::stopCluster(cl)
+# dev.off()
 
-#############################################################################################

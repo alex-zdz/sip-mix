@@ -163,7 +163,7 @@ grid_eval <- function(run, repulsive_grid, n_save, n_burn, n_thin){
   
   
   #########################################################################
-  set.seed(1)
+  #set.seed(1)
   
   startt <- Sys.time()
   
@@ -208,7 +208,8 @@ op <- pboptions(type="timer")
 # Quick run for testing
 #system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = 2e0,  n_burn = 10e0, n_thin = 2, cl = cl))
 
-n_save = 5e3;  n_burn = 10e3; n_thin = 2
+#n_save = 5e3;  n_burn = 10e3; n_thin = 2
+n_save = 5e3;  n_burn = 5e3; n_thin = 2
 system.time(pblapply(1:nrow(repulsive_grid), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))
 
 #system.time(pblapply(which(repulsive_grid$dataset == "bmi_pp_fav"), grid_eval, repulsive_grid = repulsive_grid, n_save = n_save,  n_burn = n_burn, n_thin = n_thin, cl = cl))

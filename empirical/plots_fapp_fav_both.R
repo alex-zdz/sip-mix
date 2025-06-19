@@ -9,6 +9,7 @@ library(ggplot2)
 library(tidyr)
 library(patchwork)
 library(ggalt)
+library(ggsci)
 
 # replicate repulsive grid used to run the analysis in "fapp_fav_both.R"
 # Create grid
