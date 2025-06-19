@@ -4,3 +4,8 @@ results*/
 *.pdf
 *.png
 *.jpg
+*.xlsx
+*.xls
+*.csv
+*.rds
+*.RDS

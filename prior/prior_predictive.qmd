@@ -67,9 +67,6 @@ names(M_a_samp_list) <- gammas
 M_samp <- 4
 #mus_samp = rnorm(M_samp, 0, 1)
 
-
-
-
 for(gamma in gammas){
     
     
@@ -199,9 +196,120 @@ M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
 library(gridExtra)
 grid.arrange(acrates_plot, weights_plot, M_a_samp_barplot, ncol = 1)
 
+```
 
+# For the paper
+```{r}
+
+gammas = c(0, 1, 2, 3)
+alphas <- c(1, 10)
+M_values <- c(3, 4, 5, 6, 7, 8, 9, 10)
+
+grid <- expand.grid(gamma = gammas, alpha = alphas, M_samp = M_values)
+
+# Initialize a list to store results for each combination of gamma, alpha, and M_samp
+results_list <- vector("list", nrow(grid))
+
+sample_num <- 1e3
+thin <- 5
+N = 100
+
+# Iterate over the grid
+for (run in seq_len(nrow(grid))) {
+  print(run)
+  gamma <- grid$gamma[run]
+  alpha <- grid$alpha[run]
+  M_samp <- grid$M_samp[run]
+  
+    alpha_post <- rep(alpha, M_samp)
+    weights_samp <- brms::rdirichlet(1, rep(alpha_prior, M_samp))
+    #weights_trace <- matrix(ncol = M_samp, nrow = sample_num/thin)
+    M_a_samp_trace <- numeric(sample_num/thin)  
+
+    for(m in 1:sample_num){
+        #alpha_post <- rep(alpha_prior, M_samp)
+        log_demon <-  sum(2 * gamma * log(c(rdist(c(weights_samp[-1]))))) 
+        w_prop <- brms::rdirichlet(1, alpha_post)
+        log_numer <- sum(2 * gamma * log(c(rdist(c(w_prop[-1]))))) 
+        log_acrate <- min(log_numer - log_demon, 1)
+       if(log(runif(1)) < log_acrate){
+            weights_samp <-  w_prop
+        }
+
+        pred_alloc <- sample(M_samp, N, prob = weights_samp, replace = TRUE)
+        y_pred <- rep(NA, N)
+        for(i in 1:N){
+          y_pred[i] <- rnorm(1, mean = 1, sd = sqrt(2))
+        }
+
+        gaps <- (1:M_samp)[!((1:M_samp) %in% pred_alloc)]
+        M_na_samp <- length(gaps)
+        M_a_samp <- M_samp - M_na_samp
+
+          if(m %% thin == 0){
+            n_burn = 0
+            iter_aux <- (m - n_burn) / thin
+            #acrates[iter_aux, which(gamma == gammas)] <- exp(log_acrate)
+            M_a_samp_trace[iter_aux] <- M_a_samp  # Save M_a_samp for the current iteration
+          }
+        }
+
+    #M_a_samp_list[[as.character(gamma)]] <- M_a_samp_trace
+  result <- data.frame(
+    gamma = gamma,
+    alpha = alpha,
+    M_samp = M_samp,
+    M_a_samp = M_a_samp_trace
+  )
+  
+  # Store the result
+  results_list[[run]] <- result
+}
+
+# Combine all results into a single data frame
+combined_results <- do.call(rbind, results_list)
+dim(combined_results)
+table(combined_results$gamma)
+
+
+M_a_samp_barplot <- ggplot(combined_results, aes(x = (M_a_samp), fill = factor(gamma))) +
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  facet_grid(M_samp ~ alpha, labeller = label_both, space = "free_x") +
+  labs(title = "Bar Plot of M_a_samp in Combined Results",
+       x = " Value",
+       y = "",
+       fill = "") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+print(M_a_samp_barplot)
+
+M_a_samp_df <- do.call(rbind, lapply(names(M_a_samp_list), function(gamma) {
+    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, M_a_samp = M_a_samp_list[[gamma]])
+}))
+
+
+M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+  labs(title = "Bar Plot of M_a_samp Over Iterations",
+       x = "Iteration",
+       y = "M_a_samp Value") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
+#   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+#   #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
+#   labs(title = "Bar Plot of M_a_samp Over Iterations",
+#        x = "Iteration",
+#        y = "M_a_samp Value") +
+#   theme_minimal() +
+#   theme(legend.position = "bottom")
 
 ```
+
+
 
 ```{r}
 
