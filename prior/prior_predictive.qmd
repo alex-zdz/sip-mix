@@ -175,6 +175,7 @@ M_a_samp_plot <- ggplot(M_a_samp_df, aes(x = iteration, y = M_a_samp, color = ga
 
 M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  scale_x_continuous(breaks = 2:10) +
   #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
   labs(title = "Bar Plot of M_a_samp Over Iterations",
        x = "Iteration",
@@ -198,7 +199,17 @@ grid.arrange(acrates_plot, weights_plot, M_a_samp_barplot, ncol = 1)
 
 ```
 
-# For the paper
+
+
+
+
+
+
+
+
+
+
+# For the paper (current version with different M and 2 values for alpha)
 ```{r}
 
 gammas = c(0, 1, 2, 3)
@@ -271,45 +282,38 @@ combined_results <- do.call(rbind, results_list)
 dim(combined_results)
 table(combined_results$gamma)
 
-
 M_a_samp_barplot <- ggplot(combined_results, aes(x = (M_a_samp), fill = factor(gamma))) +
-  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
-  facet_grid(M_samp ~ alpha, labeller = label_both, space = "free_x") +
-  labs(title = "Bar Plot of M_a_samp in Combined Results",
-       x = " Value",
-       y = "",
-       fill = "") +
-  theme_minimal() +
-  theme(legend.position = "bottom")
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(preserve = "single", width = 0.1)) +
+  facet_grid(M_samp ~ alpha) +
+  #scale_x_discrete(drop = FALSE) +
+  labs(
+    x = expression(M[a]),
+    y = "Proportion",
+    fill = expression(gamma)
+  ) +
+  theme_minimal()
 
 print(M_a_samp_barplot)
 
-M_a_samp_df <- do.call(rbind, lapply(names(M_a_samp_list), function(gamma) {
-    data.frame(iteration = 1:(sample_num/thin), gamma = gamma, M_a_samp = M_a_samp_list[[gamma]])
-}))
+ggplot(combined_results, aes(x = (M_a_samp), fill = factor(gamma))) +
+  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = position_dodge2(preserve = "single")) +
+  facet_grid(M_samp ~ alpha)
 
 
-M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
-  geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
-  #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
-  labs(title = "Bar Plot of M_a_samp Over Iterations",
-       x = "Iteration",
-       y = "M_a_samp Value") +
-  theme_minimal() +
-  theme(legend.position = "bottom")
 
-# ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
-#   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
-#   #facet_wrap(~ gamma, ncol = 1, labeller = label_both) +
-#   labs(title = "Bar Plot of M_a_samp Over Iterations",
-#        x = "Iteration",
-#        y = "M_a_samp Value") +
-#   theme_minimal() +
-#   theme(legend.position = "bottom")
+
+combined_results %>%
+#filter(M_samp == 9) %>%
+ggplot( aes(x = (M_a_samp), fill = factor(gamma))) +
+  geom_bar(width = 1, aes(y = after_stat(prop)), position = position_dodge2(preserve = "single", width = 0)) +
+  facet_grid(M_samp ~ alpha) +
+  scale_x_continuous(breaks = 2:10) 
+
 
 ```
 
 
+# If weights plots desired
 
 ```{r}
 
@@ -445,6 +449,7 @@ for (M_samp in M_samp_values) {
   
   M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
     geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+    scale_x_continuous(breaks = 2:10) +
     labs(title = paste("Bar Plot of M_a_samp Over Iterations for", M_samp),
          x = "M_a_samp Value",
          y = "Proportion") +
@@ -604,6 +609,7 @@ for (alpha_name in names(all_results)) {
     
     M_a_samp_barplot <- ggplot(M_a_samp_df, aes(x = M_a_samp, fill = gamma)) +
       geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+      scale_x_continuous(breaks = 2:10) +
       labs(title = paste("Bar Plot of M_a_samp for M_samp =", M_samp, ",", alpha_name),
            x = "M_a_samp Value",
            y = "Proportion") +
@@ -1037,6 +1043,7 @@ M_a_samp_plot_alpha <- ggplot(M_a_samp_df_alpha, aes(x = iteration, y = M_a_samp
 # Bar plot of M_a_samp
 M_a_samp_barplot_alpha <- ggplot(M_a_samp_df_alpha, aes(x = M_a_samp, fill = gamma)) +
   geom_bar(width = 0.5, aes(y = after_stat(prop)), position = "dodge2") +
+  scale_x_continuous(breaks = 2:10) +
   facet_wrap(~ alpha, ncol = 1, labeller = label_both) +
   labs(title = "Bar Plot of M_a_samp Over Iterations",
        x = "Iteration",

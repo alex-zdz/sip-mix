@@ -80,6 +80,8 @@ for(run in 1:nrow(repulsive_grid)){
   
   print(run)
   
+
+
   zeta_samp <- repulsive_grid$zeta[run]
   gamma_samp <- repulsive_grid$gamma[run]
   dataset <- repulsive_grid$dataset[run]
@@ -248,13 +250,58 @@ dev.off()
 # dev.off()
 
 
-# too many clusters
-# zeta = 0.5, gamma = 0
-# too much smoothing
-# zeta = 0.5, gamma = 2
-# right balance:
-# zeta = 2, gamma = 2
+# for the paper:
+# run = 80, 84 and 95
 library(patchwork)
+binder_paper <- list()
+
+for(run in c(80, 84, 95)){
+  zeta_samp <- repulsive_grid$zeta[run]
+  gamma_samp <- repulsive_grid$gamma[run]
+  dataset <- repulsive_grid$dataset[run]
+  update <- repulsive_grid$update[run]
+  alpha_samp <- repulsive_grid$alpha[run]
+  
+  filename <- paste0( paste0(colnames(repulsive_grid[run,-3]), "_"), paste0(repulsive_grid[run,-3]), collapse = "_" )
+
+  allocs_samp = readRDS(paste0("empirical/results_",dataset,"/allocs/allocs_", filename,".rds")) 
+
+  s_binder <-  c(salso(allocs_samp, loss=salso::binder(a=1)))
+  
+  df <- data.frame(x = y[,1], y = y[,2], Cluster = as.factor(s_binder))
+  
+  pdf(paste0("empirical/results_bmi_pp_fa/dashboards/binder_paper_zeta _", zeta_samp, "_gamma_", gamma_samp, "_alpha_", alpha_samp, ".pdf"), width = 12, height = 10)
+
+ binder_paper[[run]] <- 
+   ggplot() +
+   geom_point(data = df, aes(x = x, y = y, color = Cluster),  size = 2) +
+   geom_encircle(data = df, aes(x = x, y = y, group = Cluster, fill = Cluster),
+                 size = 0.5, expand = 0, alpha = 0.15, s_shape=0.5,  spread=0.025) +
+     scale_fill_npg() +
+     scale_color_npg() +
+   labs(title = paste0(""), 
+   x = "BMI", y = "Food Approach Person Parameter") + 
+   theme_minimal() +
+   theme(text=element_text(size=20), #change font size of all text
+         axis.text=element_text(size=20), #change font size of axis text
+         axis.title=element_text(size=20), #change font size of axis titles
+         plot.title=element_text(size=20), #change font size of plot title
+         legend.text=element_text(size=20), #change font size of legend text
+         legend.title=element_text(size=20),#change font size of legend title
+   ) 
+
+  print(binder_paper[[run]])
+
+  dev.off()
+
+}
+
+
+
+
+
+
+
 pdf(paste0("empirical/results_",dataset,"/dashboards/", "test.pdf"), width = 12, height = 6)
 
 #print(binder.ggs[[85]] + binder.ggs[[89]] + binder.ggs[[101]])
